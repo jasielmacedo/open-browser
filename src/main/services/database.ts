@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import path from 'path';
+import { validateUrl } from '../utils/validation';
 
 export interface HistoryEntry {
   id?: number;
@@ -146,6 +147,9 @@ class DatabaseService {
   addHistory(entry: HistoryEntry): number {
     if (!this.db) throw new Error('Database not initialized');
 
+    // Validate URL for security
+    validateUrl(entry.url, 'History entry URL');
+
     // Check if URL was visited recently (within last 30 minutes)
     const recentVisit = this.db.prepare(`
       SELECT id, visit_count FROM history
@@ -235,6 +239,9 @@ class DatabaseService {
   addBookmark(bookmark: Bookmark): number {
     if (!this.db) throw new Error('Database not initialized');
 
+    // Validate URL for security
+    validateUrl(bookmark.url, 'Bookmark URL');
+
     const now = Date.now();
     try {
       const result = this.db.prepare(`
@@ -305,6 +312,10 @@ class DatabaseService {
 
   isBookmarked(url: string): boolean {
     if (!this.db) throw new Error('Database not initialized');
+
+    // Validate URL for security
+    validateUrl(url, 'Bookmark lookup URL');
+
     const result = this.db.prepare('SELECT id FROM bookmarks WHERE url = ?').get(url);
     return !!result;
   }
@@ -316,46 +327,53 @@ class DatabaseService {
 
   deleteBookmarkByUrl(url: string): void {
     if (!this.db) throw new Error('Database not initialized');
+
+    // Validate URL for security
+    validateUrl(url, 'Bookmark deletion URL');
+
     this.db.prepare('DELETE FROM bookmarks WHERE url = ?').run(url);
   }
 
   updateBookmark(id: number, updates: Partial<Bookmark>): void {
     if (!this.db) throw new Error('Database not initialized');
 
+    // Use a whitelist approach for allowed fields to prevent SQL injection
+    const allowedFields = ['title', 'favicon', 'tags', 'notes', 'url'] as const;
+    type AllowedField = typeof allowedFields[number];
+
     const fields: string[] = [];
     const values: any[] = [];
 
-    if (updates.title !== undefined) {
-      fields.push('title = ?');
-      values.push(updates.title);
-    }
-    if (updates.favicon !== undefined) {
-      fields.push('favicon = ?');
-      values.push(updates.favicon);
-    }
-    if (updates.tags !== undefined) {
-      fields.push('tags = ?');
-      values.push(updates.tags);
-    }
-    if (updates.notes !== undefined) {
-      fields.push('notes = ?');
-      values.push(updates.notes);
+    // Only process fields that are in the whitelist
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(updates[field]);
+      }
     }
 
     if (fields.length === 0) return;
 
+    // Always update the updated_at timestamp
     fields.push('updated_at = ?');
     values.push(Date.now());
     values.push(id);
 
-    this.db.prepare(`
-      UPDATE bookmarks SET ${fields.join(', ')} WHERE id = ?
-    `).run(...values);
+    // Build the query safely - fields array only contains whitelisted field names
+    const query = `UPDATE bookmarks SET ${fields.join(', ')} WHERE id = ?`;
+    this.db.prepare(query).run(...values);
   }
 
   // Tab session operations
   saveTabs(tabs: Tab[]): void {
     if (!this.db) throw new Error('Database not initialized');
+
+    // Validate all tab URLs for security
+    for (const tab of tabs) {
+      if (tab.url) {
+        validateUrl(tab.url, 'Tab URL');
+      }
+    }
 
     // Clear existing tabs and save new ones
     this.db.prepare('DELETE FROM tabs').run();

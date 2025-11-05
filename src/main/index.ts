@@ -24,12 +24,26 @@ const createWindow = () => {
     minHeight: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      // Security: Disable node integration to prevent direct Node.js access from renderer
       nodeIntegration: false,
+      // Security: Enable context isolation to separate preload and renderer contexts
       contextIsolation: true,
-      sandbox: false, // Must be false for webview to work
+      // Security: Sandbox is disabled for webview functionality
+      // Note: This reduces security isolation. Webviews have their own sandboxing
+      // and we mitigate this with:
+      // - Strict IPC channel whitelisting in preload script
+      // - URL validation before loading content
+      // - Content Security Policy
+      // - Navigation guards in web-contents-created handler
+      sandbox: false,
+      // Security: Enable web security features (same-origin policy, etc.)
       webSecurity: true,
+      // Security: Prevent loading insecure content on HTTPS pages
       allowRunningInsecureContent: false,
-      webviewTag: true // Enable webview tag
+      // Enable webview tag for browser functionality
+      // Note: webviewTag is deprecated but required for this use case
+      // Webviews are configured with contextIsolation and safe webpreferences
+      webviewTag: true
     },
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#1a1d24',
@@ -77,8 +91,24 @@ app.whenReady().then(() => {
 
   // Setup download handling
   session.defaultSession.on('will-download', (event, item, webContents) => {
-    // Save to default downloads folder
-    const filename = item.getFilename();
+    // Save to default downloads folder with sanitized filename
+    let filename = item.getFilename();
+
+    // Sanitize filename to prevent path traversal attacks
+    // Remove path separators and other dangerous characters
+    filename = path.basename(filename).replace(/[<>:"|?*\x00-\x1F]/g, '_');
+
+    // Prevent hidden files and ensure filename is not empty
+    if (!filename || filename.startsWith('.')) {
+      filename = 'download_' + Date.now();
+    }
+
+    // Limit filename length to prevent issues
+    if (filename.length > 255) {
+      const ext = path.extname(filename);
+      filename = filename.substring(0, 255 - ext.length) + ext;
+    }
+
     const downloadPath = path.join(app.getPath('downloads'), filename);
     item.setSavePath(downloadPath);
 
@@ -131,37 +161,41 @@ app.on('web-contents-created', (event, contents) => {
   // Check if this is a webview
   const isWebview = contents.getType() === 'webview';
 
+  // Security: Control navigation to prevent malicious redirects
   contents.on('will-navigate', (event, navigationUrl) => {
     try {
       const parsedUrl = new URL(navigationUrl);
 
-      // Allow HTTP(S) navigation in webviews
-      if (isWebview && parsedUrl.protocol.startsWith('http')) {
+      // Allow HTTP(S) and view-source navigation in webviews
+      if (isWebview && (parsedUrl.protocol.startsWith('http') || parsedUrl.protocol === 'view-source:')) {
         return; // Allow navigation
       }
 
-      // Block navigation in main window
+      // Block all navigation in main window (only renderer-initiated loads allowed)
       if (!isWebview) {
         event.preventDefault();
         return;
       }
 
-      // Block non-HTTP(S) protocols in webviews
-      if (!parsedUrl.protocol.startsWith('http')) {
+      // Block dangerous protocols in webviews (javascript:, data:, file:, etc.)
+      if (!parsedUrl.protocol.startsWith('http') && parsedUrl.protocol !== 'view-source:') {
+        console.warn('Blocked navigation to unsafe protocol:', parsedUrl.protocol);
         event.preventDefault();
       }
     } catch (error) {
-      // Invalid URL, block it
+      // Invalid URL, block it for security
+      console.warn('Blocked navigation to invalid URL');
       event.preventDefault();
     }
   });
 
-  // Handle new window requests
+  // Security: Handle new window requests
   contents.setWindowOpenHandler(({ url }) => {
-    // In webview, open links in the same webview instead of new window
-    if (isWebview) {
-      return { action: 'deny' };
-    }
+    // Security: Deny all new window/popup requests to prevent:
+    // - Popup spam
+    // - Phishing attempts via new windows
+    // - Bypassing navigation guards
+    // Links that try to open new windows will be handled by the webview's new-window event
     return { action: 'deny' };
   });
 
