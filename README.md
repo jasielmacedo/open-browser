@@ -1,4 +1,4 @@
-# Browser-LLM
+# Open Browser
 
 A Chromium-based browser with integrated local LLM capabilities for intelligent web interaction.
 
