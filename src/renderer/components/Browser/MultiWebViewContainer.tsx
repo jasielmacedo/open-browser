@@ -399,9 +399,14 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                 src={tab.url}
                 className="w-full h-full"
                 // @ts-ignore - webview is a custom Electron element
+                // Security: Use persistent partition for session data
                 partition="persist:main"
+                // Security: Disable popups to prevent popup spam and phishing
                 allowpopups="false"
-                webpreferences="contextIsolation=true,javascript=yes,plugins=yes"
+                // Security: Enable context isolation, allow javascript and plugins for full browsing
+                // Note: Webviews are sandboxed separately from the main renderer process
+                webpreferences="contextIsolation=true,javascript=yes,plugins=yes,sandbox=true"
+                // User agent string for compatibility
                 useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
               />
             )}
