@@ -443,15 +443,25 @@ class DatabaseService {
   loadTabs(): Tab[] {
     if (!this.db) throw new Error('Database not initialized');
 
-    return this.db
+    const rows = this.db
       .prepare(
         `
-      SELECT id, url, title, favicon, is_active as isActive, position
+      SELECT id, url, title, favicon, is_active, position
       FROM tabs
       ORDER BY position ASC
     `
       )
-      .all() as Tab[];
+      .all() as any[];
+
+    // Convert is_active (INTEGER 0/1) to boolean
+    return rows.map((row) => ({
+      id: row.id,
+      url: row.url,
+      title: row.title,
+      favicon: row.favicon,
+      isActive: Boolean(row.is_active),
+      position: row.position,
+    }));
   }
 
   clearTabs(): void {
