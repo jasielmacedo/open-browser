@@ -1,6 +1,6 @@
 console.log('===== MAIN PROCESS STARTING =====');
 
-import { app, BrowserWindow, session, Menu } from 'electron';
+import { app, BrowserWindow, session, Menu, MenuItem } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { databaseService } from './services/database';
@@ -43,13 +43,13 @@ const createWindow = () => {
       // Enable webview tag for browser functionality
       // Note: webviewTag is deprecated but required for this use case
       // Webviews are configured with contextIsolation and safe webpreferences
-      webviewTag: true
+      webviewTag: true,
     },
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#1a1d24',
     show: false, // Don't show until ready
     autoHideMenuBar: true, // Hide menu bar
-    frame: true // Keep window frame for title bar controls
+    frame: true, // Keep window frame for title bar controls
   });
 
   // Load the app
@@ -90,12 +90,13 @@ app.whenReady().then(() => {
   }
 
   // Setup download handling
-  session.defaultSession.on('will-download', (event, item, webContents) => {
+  session.defaultSession.on('will-download', (_event, item, _webContents) => {
     // Save to default downloads folder with sanitized filename
     let filename = item.getFilename();
 
     // Sanitize filename to prevent path traversal attacks
     // Remove path separators and other dangerous characters
+    // eslint-disable-next-line no-control-regex
     filename = path.basename(filename).replace(/[<>:"|?*\x00-\x1F]/g, '_');
 
     // Prevent hidden files and ensure filename is not empty
@@ -167,7 +168,10 @@ app.on('web-contents-created', (event, contents) => {
       const parsedUrl = new URL(navigationUrl);
 
       // Allow HTTP(S) and view-source navigation in webviews
-      if (isWebview && (parsedUrl.protocol.startsWith('http') || parsedUrl.protocol === 'view-source:')) {
+      if (
+        isWebview &&
+        (parsedUrl.protocol.startsWith('http') || parsedUrl.protocol === 'view-source:')
+      ) {
         return; // Allow navigation
       }
 
@@ -182,7 +186,7 @@ app.on('web-contents-created', (event, contents) => {
         console.warn('Blocked navigation to unsafe protocol:', parsedUrl.protocol);
         event.preventDefault();
       }
-    } catch (error) {
+    } catch {
       // Invalid URL, block it for security
       console.warn('Blocked navigation to invalid URL');
       event.preventDefault();
@@ -190,7 +194,7 @@ app.on('web-contents-created', (event, contents) => {
   });
 
   // Security: Handle new window requests
-  contents.setWindowOpenHandler(({ url }) => {
+  contents.setWindowOpenHandler(({ url: _url }) => {
     // Security: Deny all new window/popup requests to prevent:
     // - Popup spam
     // - Phishing attempts via new windows
@@ -202,30 +206,35 @@ app.on('web-contents-created', (event, contents) => {
   // Enable context menu for webviews
   if (isWebview) {
     contents.on('context-menu', (event, params) => {
-      const { Menu, MenuItem } = require('electron');
       const menu = new Menu();
 
       // Back
       if (contents.canGoBack()) {
-        menu.append(new MenuItem({
-          label: 'Back',
-          click: () => contents.goBack()
-        }));
+        menu.append(
+          new MenuItem({
+            label: 'Back',
+            click: () => contents.goBack(),
+          })
+        );
       }
 
       // Forward
       if (contents.canGoForward()) {
-        menu.append(new MenuItem({
-          label: 'Forward',
-          click: () => contents.goForward()
-        }));
+        menu.append(
+          new MenuItem({
+            label: 'Forward',
+            click: () => contents.goForward(),
+          })
+        );
       }
 
       // Reload
-      menu.append(new MenuItem({
-        label: 'Reload',
-        click: () => contents.reload()
-      }));
+      menu.append(
+        new MenuItem({
+          label: 'Reload',
+          click: () => contents.reload(),
+        })
+      );
 
       // Separator
       if (menu.items.length > 0) {
@@ -234,24 +243,30 @@ app.on('web-contents-created', (event, contents) => {
 
       // Copy/Cut/Paste based on context
       if (params.editFlags.canCut) {
-        menu.append(new MenuItem({
-          label: 'Cut',
-          role: 'cut'
-        }));
+        menu.append(
+          new MenuItem({
+            label: 'Cut',
+            role: 'cut',
+          })
+        );
       }
 
       if (params.editFlags.canCopy || params.selectionText) {
-        menu.append(new MenuItem({
-          label: 'Copy',
-          role: 'copy'
-        }));
+        menu.append(
+          new MenuItem({
+            label: 'Copy',
+            role: 'copy',
+          })
+        );
       }
 
       if (params.editFlags.canPaste) {
-        menu.append(new MenuItem({
-          label: 'Paste',
-          role: 'paste'
-        }));
+        menu.append(
+          new MenuItem({
+            label: 'Paste',
+            role: 'paste',
+          })
+        );
       }
 
       // Separator if we added edit items
@@ -260,24 +275,27 @@ app.on('web-contents-created', (event, contents) => {
       }
 
       // View Page Source
-      menu.append(new MenuItem({
-        label: 'View Page Source',
-        click: () => {
-          // Send to renderer to open in new tab
-          mainWindow?.webContents.send('open-view-source', contents.getURL());
-        }
-      }));
+      menu.append(
+        new MenuItem({
+          label: 'View Page Source',
+          click: () => {
+            // Send to renderer to open in new tab
+            mainWindow?.webContents.send('open-view-source', contents.getURL());
+          },
+        })
+      );
 
       // Inspect Element
-      menu.append(new MenuItem({
-        label: 'Inspect Element',
-        click: () => {
-          contents.inspectElement(params.x, params.y);
-        }
-      }));
+      menu.append(
+        new MenuItem({
+          label: 'Inspect Element',
+          click: () => {
+            contents.inspectElement(params.x, params.y);
+          },
+        })
+      );
 
       menu.popup();
     });
   }
 });
-

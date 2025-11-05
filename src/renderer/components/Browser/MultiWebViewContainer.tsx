@@ -191,12 +191,14 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
       // Update history
       const url = webview.getURL();
       if (url) {
-        browserDataService.addHistory({
-          url,
-          title: title || url,
-          visitTime: Date.now(),
-          favicon: '',
-        }).catch(err => console.error('Failed to update history:', err));
+        browserDataService
+          .addHistory({
+            url,
+            title: title || url,
+            visitTime: Date.now(),
+            favicon: '',
+          })
+          .catch((err) => console.error('Failed to update history:', err));
       }
     };
 
@@ -222,12 +224,14 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
 
       // Save to history
       const title = webview.getTitle() || e.url;
-      browserDataService.addHistory({
-        url: e.url,
-        title,
-        visitTime: Date.now(),
-        favicon: '',
-      }).catch(err => console.error('Failed to save history:', err));
+      browserDataService
+        .addHistory({
+          url: e.url,
+          title,
+          visitTime: Date.now(),
+          favicon: '',
+        })
+        .catch((err) => console.error('Failed to save history:', err));
     };
 
     const handleDidNavigateInPage = (e: any) => {
@@ -283,7 +287,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         setCanGoForward(activeWebview.canGoForward());
         setCurrentUrl(activeWebview.getURL() || '');
         setPageTitle(activeWebview.getTitle() || '');
-      } catch (e) {
+      } catch {
         // Webview not ready yet
       }
     }
@@ -291,7 +295,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
 
   // Navigate tab when URL changes (after initial mount)
   useEffect(() => {
-    tabs.forEach(tab => {
+    tabs.forEach((tab) => {
       const webview = webviewRefs.current[tab.id];
       if (!webview || !tab.url) return;
 
@@ -310,7 +314,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         if (currentUrl && currentUrl !== tab.url) {
           webview.loadURL(tab.url);
         }
-      } catch (error) {
+      } catch {
         // Webview might not be ready, ignore the error
         // The src attribute will handle the navigation
       }
@@ -324,10 +328,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         const shouldRenderWebview = !tab.isSuspended;
 
         return (
-          <div
-            key={tab.id}
-            className={`absolute inset-0 ${isVisible ? 'block' : 'hidden'}`}
-          >
+          <div key={tab.id} className={`absolute inset-0 ${isVisible ? 'block' : 'hidden'}`}>
             {/* Suspended Tab Placeholder */}
             {tab.isSuspended && isVisible && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 bg-background">
@@ -336,15 +337,23 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                     {tab.favicon ? (
                       <img src={tab.favicon} alt="" className="w-8 h-8" />
                     ) : (
-                      <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                      <svg
+                        className="w-8 h-8 text-muted-foreground"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                        />
                       </svg>
                     )}
                   </div>
                   <h2 className="text-xl font-semibold">Tab Suspended</h2>
-                  <p className="text-muted-foreground">
-                    This tab was suspended to save memory.
-                  </p>
+                  <p className="text-muted-foreground">This tab was suspended to save memory.</p>
                   <p className="text-sm text-muted-foreground truncate max-w-full">
                     {tab.title || tab.url || 'No title'}
                   </p>
@@ -365,8 +374,18 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
             {!tab.url && !tab.isSuspended && isVisible && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-background">
                 <div className="space-y-4 max-w-md">
-                  <svg className="w-16 h-16 mx-auto text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  <svg
+                    className="w-16 h-16 mx-auto text-muted-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                    />
                   </svg>
                   <h2 className="text-2xl font-semibold">Welcome to Browser-LLM</h2>
                   <p className="text-muted-foreground">

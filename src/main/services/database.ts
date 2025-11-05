@@ -151,32 +151,46 @@ class DatabaseService {
     validateUrl(entry.url, 'History entry URL');
 
     // Check if URL was visited recently (within last 30 minutes)
-    const recentVisit = this.db.prepare(`
+    const recentVisit = this.db
+      .prepare(
+        `
       SELECT id, visit_count FROM history
       WHERE url = ? AND visit_time > ?
       ORDER BY visit_time DESC LIMIT 1
-    `).get(entry.url, Date.now() - 30 * 60 * 1000) as { id: number; visit_count: number } | undefined;
+    `
+      )
+      .get(entry.url, Date.now() - 30 * 60 * 1000) as
+      | { id: number; visit_count: number }
+      | undefined;
 
     if (recentVisit) {
       // Update existing entry
-      this.db.prepare(`
+      this.db
+        .prepare(
+          `
         UPDATE history
         SET visit_count = ?, visit_time = ?, title = ?, favicon = ?
         WHERE id = ?
-      `).run(
-        recentVisit.visit_count + 1,
-        entry.visitTime,
-        entry.title,
-        entry.favicon || null,
-        recentVisit.id
-      );
+      `
+        )
+        .run(
+          recentVisit.visit_count + 1,
+          entry.visitTime,
+          entry.title,
+          entry.favicon || null,
+          recentVisit.id
+        );
       return recentVisit.id;
     } else {
       // Insert new entry
-      const result = this.db.prepare(`
+      const result = this.db
+        .prepare(
+          `
         INSERT INTO history (url, title, visit_time, favicon, visit_count)
         VALUES (?, ?, ?, ?, 1)
-      `).run(entry.url, entry.title, entry.visitTime, entry.favicon || null);
+      `
+        )
+        .run(entry.url, entry.title, entry.visitTime, entry.favicon || null);
       return result.lastInsertRowid as number;
     }
   }
@@ -186,12 +200,16 @@ class DatabaseService {
 
     if (!query.trim()) {
       // Return recent history
-      return this.db.prepare(`
+      return this.db
+        .prepare(
+          `
         SELECT id, url, title, visit_time as visitTime, visit_count as visitCount, favicon
         FROM history
         ORDER BY visit_time DESC
         LIMIT ?
-      `).all(limit) as HistoryEntry[];
+      `
+        )
+        .all(limit) as HistoryEntry[];
     }
 
     // Escape FTS5 special characters and quote the query
@@ -199,25 +217,33 @@ class DatabaseService {
     const escapedQuery = '"' + query.replace(/"/g, '""') + '"';
 
     // Full-text search
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT h.id, h.url, h.title, h.visit_time as visitTime, h.visit_count as visitCount, h.favicon
       FROM history_fts fts
       JOIN history h ON h.id = fts.rowid
       WHERE history_fts MATCH ?
       ORDER BY h.visit_time DESC
       LIMIT ?
-    `).all(escapedQuery, limit) as HistoryEntry[];
+    `
+      )
+      .all(escapedQuery, limit) as HistoryEntry[];
   }
 
   getHistory(limit = 100, offset = 0): HistoryEntry[] {
     if (!this.db) throw new Error('Database not initialized');
 
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT id, url, title, visit_time as visitTime, visit_count as visitCount, favicon
       FROM history
       ORDER BY visit_time DESC
       LIMIT ? OFFSET ?
-    `).all(limit, offset) as HistoryEntry[];
+    `
+      )
+      .all(limit, offset) as HistoryEntry[];
   }
 
   deleteHistory(id: number): void {
@@ -244,35 +270,45 @@ class DatabaseService {
 
     const now = Date.now();
     try {
-      const result = this.db.prepare(`
+      const result = this.db
+        .prepare(
+          `
         INSERT INTO bookmarks (url, title, favicon, tags, notes, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        bookmark.url,
-        bookmark.title,
-        bookmark.favicon || null,
-        bookmark.tags || null,
-        bookmark.notes || null,
-        bookmark.createdAt || now,
-        bookmark.updatedAt || now
-      );
-      return result.lastInsertRowid as number;
-    } catch (error: any) {
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-        // Update existing bookmark
-        this.db.prepare(`
-          UPDATE bookmarks
-          SET title = ?, favicon = ?, tags = ?, notes = ?, updated_at = ?
-          WHERE url = ?
-        `).run(
+      `
+        )
+        .run(
+          bookmark.url,
           bookmark.title,
           bookmark.favicon || null,
           bookmark.tags || null,
           bookmark.notes || null,
-          now,
-          bookmark.url
+          bookmark.createdAt || now,
+          bookmark.updatedAt || now
         );
-        const existing = this.db.prepare('SELECT id FROM bookmarks WHERE url = ?').get(bookmark.url) as { id: number };
+      return result.lastInsertRowid as number;
+    } catch (error: any) {
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        // Update existing bookmark
+        this.db
+          .prepare(
+            `
+          UPDATE bookmarks
+          SET title = ?, favicon = ?, tags = ?, notes = ?, updated_at = ?
+          WHERE url = ?
+        `
+          )
+          .run(
+            bookmark.title,
+            bookmark.favicon || null,
+            bookmark.tags || null,
+            bookmark.notes || null,
+            now,
+            bookmark.url
+          );
+        const existing = this.db
+          .prepare('SELECT id FROM bookmarks WHERE url = ?')
+          .get(bookmark.url) as { id: number };
         return existing.id;
       }
       throw error;
@@ -282,12 +318,16 @@ class DatabaseService {
   getBookmarks(limit = 100, offset = 0): Bookmark[] {
     if (!this.db) throw new Error('Database not initialized');
 
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT id, url, title, favicon, tags, notes, created_at as createdAt, updated_at as updatedAt
       FROM bookmarks
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `).all(limit, offset) as Bookmark[];
+    `
+      )
+      .all(limit, offset) as Bookmark[];
   }
 
   searchBookmarks(query: string, limit = 50): Bookmark[] {
@@ -300,14 +340,18 @@ class DatabaseService {
     // Escape FTS5 special characters and quote the query
     const escapedQuery = '"' + query.replace(/"/g, '""') + '"';
 
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT b.id, b.url, b.title, b.favicon, b.tags, b.notes, b.created_at as createdAt, b.updated_at as updatedAt
       FROM bookmarks_fts fts
       JOIN bookmarks b ON b.id = fts.rowid
       WHERE bookmarks_fts MATCH ?
       ORDER BY b.created_at DESC
       LIMIT ?
-    `).all(escapedQuery, limit) as Bookmark[];
+    `
+      )
+      .all(escapedQuery, limit) as Bookmark[];
   }
 
   isBookmarked(url: string): boolean {
@@ -339,7 +383,6 @@ class DatabaseService {
 
     // Use a whitelist approach for allowed fields to prevent SQL injection
     const allowedFields = ['title', 'favicon', 'tags', 'notes', 'url'] as const;
-    type AllowedField = typeof allowedFields[number];
 
     const fields: string[] = [];
     const values: any[] = [];
@@ -400,11 +443,15 @@ class DatabaseService {
   loadTabs(): Tab[] {
     if (!this.db) throw new Error('Database not initialized');
 
-    return this.db.prepare(`
+    return this.db
+      .prepare(
+        `
       SELECT id, url, title, favicon, is_active as isActive, position
       FROM tabs
       ORDER BY position ASC
-    `).all() as Tab[];
+    `
+      )
+      .all() as Tab[];
   }
 
   clearTabs(): void {

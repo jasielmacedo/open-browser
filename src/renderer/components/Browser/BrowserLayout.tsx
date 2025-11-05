@@ -11,7 +11,8 @@ import { useTabsStore } from '../../store/tabs';
 export const BrowserLayout: React.FC = () => {
   const webviewRef = useRef<WebViewHandle>(null);
   const { toggleHistory, toggleBookmarks } = useBrowserStore();
-  const { tabs, activeTabId, addTab, closeTab, setActiveTab, loadTabs, suspendInactiveTabs } = useTabsStore();
+  const { tabs, activeTabId, addTab, closeTab, setActiveTab, loadTabs, suspendInactiveTabs } =
+    useTabsStore();
 
   // Load tabs on mount
   useEffect(() => {
@@ -51,7 +52,7 @@ export const BrowserLayout: React.FC = () => {
       // Ctrl + Tab - Next Tab
       if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
         e.preventDefault();
-        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
         if (currentIndex !== -1) {
           const nextIndex = (currentIndex + 1) % tabs.length;
           setActiveTab(tabs[nextIndex].id);
@@ -61,7 +62,7 @@ export const BrowserLayout: React.FC = () => {
       // Ctrl + Shift + Tab - Previous Tab
       if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) {
         e.preventDefault();
-        const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+        const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
         if (currentIndex !== -1) {
           const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
           setActiveTab(tabs[prevIndex].id);
@@ -86,7 +87,7 @@ export const BrowserLayout: React.FC = () => {
       }
 
       // Ctrl/Cmd + R or F5 - Reload
-      if ((e.ctrlKey || e.metaKey) && e.key === 'r' || e.key === 'F5') {
+      if (((e.ctrlKey || e.metaKey) && e.key === 'r') || e.key === 'F5') {
         e.preventDefault();
         webviewRef.current?.reload();
       }

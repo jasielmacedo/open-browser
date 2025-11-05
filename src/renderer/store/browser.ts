@@ -51,12 +51,19 @@ export const useBrowserStore = create<BrowserState>((set) => ({
   setLoadProgress: (progress) => set({ loadProgress: progress }),
   setCanGoBack: (canGoBack) => set({ canGoBack }),
   setCanGoForward: (canGoForward) => set({ canGoForward }),
-  toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen, showHistory: false, showBookmarks: false })),
+  toggleChat: () =>
+    set((state) => ({ isChatOpen: !state.isChatOpen, showHistory: false, showBookmarks: false })),
   setIsChatOpen: (open) => set({ isChatOpen: open }),
   setIsBookmarked: (bookmarked) => set({ isBookmarked: bookmarked }),
-  toggleHistory: () => set((state) => ({ showHistory: !state.showHistory, isChatOpen: false, showBookmarks: false })),
+  toggleHistory: () =>
+    set((state) => ({ showHistory: !state.showHistory, isChatOpen: false, showBookmarks: false })),
   setShowHistory: (show) => set({ showHistory: show }),
-  toggleBookmarks: () => set((state) => ({ showBookmarks: !state.showBookmarks, isChatOpen: false, showHistory: false })),
+  toggleBookmarks: () =>
+    set((state) => ({
+      showBookmarks: !state.showBookmarks,
+      isChatOpen: false,
+      showHistory: false,
+    })),
   setShowBookmarks: (show) => set({ showBookmarks: show }),
   setZoomLevel: (zoom) => set({ zoomLevel: zoom }),
   resetZoom: () => set({ zoomLevel: 100 }),

@@ -1,9 +1,9 @@
-import React, { useState, KeyboardEvent, RefObject, useEffect } from "react";
-import { useBrowserStore } from "../../store/browser";
-import { useTabsStore } from "../../store/tabs";
-import { WebViewHandle } from "./MultiWebViewContainer";
-import { browserDataService } from "../../services/browserData";
-import { ContextMenu, ContextMenuItem } from "./ContextMenu";
+import React, { useState, KeyboardEvent, RefObject, useEffect } from 'react';
+import { useBrowserStore } from '../../store/browser';
+import { useTabsStore } from '../../store/tabs';
+import { WebViewHandle } from './MultiWebViewContainer';
+import { browserDataService } from '../../services/browserData';
+import { ContextMenu, ContextMenuItem } from './ContextMenu';
 
 interface NavigationBarProps {
   webviewRef: RefObject<WebViewHandle>;
@@ -28,7 +28,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   } = useBrowserStore();
   const { updateTab, activeTabId } = useTabsStore();
 
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [suggestions, setSuggestions] = useState<
     Array<{ url: string; title: string; visitCount?: number }>
@@ -43,7 +43,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       browserDataService
         .isBookmarked(currentUrl)
         .then(setIsBookmarked)
-        .catch((err) => console.error("Failed to check bookmark status:", err));
+        .catch((err) => console.error('Failed to check bookmark status:', err));
     } else {
       setIsBookmarked(false);
     }
@@ -67,7 +67,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
         setIsBookmarked(true);
       }
     } catch (err) {
-      console.error("Failed to toggle bookmark:", err);
+      console.error('Failed to toggle bookmark:', err);
     }
   };
 
@@ -89,7 +89,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           );
           setSelectedSuggestionIndex(-1);
         })
-        .catch((err) => console.error("Failed to fetch suggestions:", err));
+        .catch((err) => console.error('Failed to fetch suggestions:', err));
     } else {
       setSuggestions([]);
       setSelectedSuggestionIndex(-1);
@@ -102,10 +102,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     let url = inputValue.trim();
 
     // Add protocol if missing
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
       // Check if it looks like a URL
-      if (url.includes(".") && !url.includes(" ")) {
-        url = "https://" + url;
+      if (url.includes('.') && !url.includes(' ')) {
+        url = 'https://' + url;
       } else {
         // Treat as search query
         url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
@@ -117,17 +117,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     if (activeTabId) {
       updateTab(activeTabId, { url });
     }
-    setInputValue("");
+    setInputValue('');
     // Blur the input to show the currentUrl
     (document.activeElement as HTMLInputElement)?.blur();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      if (
-        selectedSuggestionIndex >= 0 &&
-        suggestions[selectedSuggestionIndex]
-      ) {
+    if (e.key === 'Enter') {
+      if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
         // Navigate to selected suggestion
         const url = suggestions[selectedSuggestionIndex].url;
         setCurrentUrl(url);
@@ -135,26 +132,24 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
         if (activeTabId) {
           updateTab(activeTabId, { url });
         }
-        setInputValue("");
+        setInputValue('');
         setSuggestions([]);
         (e.target as HTMLInputElement).blur();
       } else {
         handleNavigate();
       }
-    } else if (e.key === "Escape") {
+    } else if (e.key === 'Escape') {
       if (suggestions.length > 0) {
         setSuggestions([]);
         setSelectedSuggestionIndex(-1);
       } else {
-        setInputValue("");
+        setInputValue('');
         (e.target as HTMLInputElement).blur();
       }
-    } else if (e.key === "ArrowDown") {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedSuggestionIndex((prev) =>
-        prev < suggestions.length - 1 ? prev + 1 : prev
-      );
-    } else if (e.key === "ArrowUp") {
+      setSelectedSuggestionIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedSuggestionIndex((prev) => (prev > -1 ? prev - 1 : -1));
     }
@@ -175,7 +170,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       setSuggestions([]);
       setSelectedSuggestionIndex(-1);
       if (!inputValue) {
-        setInputValue("");
+        setInputValue('');
       }
     }, 200);
   };
@@ -186,7 +181,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     if (activeTabId) {
       updateTab(activeTabId, { url });
     }
-    setInputValue("");
+    setInputValue('');
     setSuggestions([]);
     setIsFocused(false);
   };
@@ -214,20 +209,15 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   };
 
   // Check if URL is secure
-  const isSecure = currentUrl.startsWith("https://");
+  const isSecure = currentUrl.startsWith('https://');
   const hasUrl = !!currentUrl;
 
   const menuItems: ContextMenuItem[] = [
     {
-      label: "Zoom In",
-      shortcut: "Ctrl++",
+      label: 'Zoom In',
+      shortcut: 'Ctrl++',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -239,15 +229,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       onClick: () => webviewRef.current?.zoomIn(),
     },
     {
-      label: "Zoom Out",
-      shortcut: "Ctrl+-",
+      label: 'Zoom Out',
+      shortcut: 'Ctrl+-',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -259,15 +244,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       onClick: () => webviewRef.current?.zoomOut(),
     },
     {
-      label: "Reset Zoom",
-      shortcut: "Ctrl+0",
+      label: 'Reset Zoom',
+      shortcut: 'Ctrl+0',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -278,17 +258,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       ),
       onClick: () => webviewRef.current?.resetZoom(),
     },
-    { label: "", separator: true, onClick: () => {} },
+    { label: '', separator: true, onClick: () => {} },
     {
-      label: "Print...",
-      shortcut: "Ctrl+P",
+      label: 'Print...',
+      shortcut: 'Ctrl+P',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -300,15 +275,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       onClick: () => webviewRef.current?.print(),
     },
     {
-      label: "View Page Source",
-      shortcut: "Ctrl+U",
+      label: 'View Page Source',
+      shortcut: 'Ctrl+U',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -321,15 +291,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       disabled: !hasUrl,
     },
     {
-      label: "Developer Tools",
-      shortcut: "F12",
+      label: 'Developer Tools',
+      shortcut: 'F12',
       icon: (
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -353,12 +318,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
             className="p-2 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Back"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -373,32 +333,17 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
             className="p-2 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Forward"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
           <button
             onClick={handleRefresh}
             className="p-2 rounded hover:bg-accent transition-colors"
-            title={isLoading ? "Stop loading" : "Refresh"}
+            title={isLoading ? 'Stop loading' : 'Refresh'}
           >
             {isLoading ? (
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -407,12 +352,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
                 />
               </svg>
             ) : (
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -443,7 +383,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
                     d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                   />
                 </svg>
-              ) : currentUrl.startsWith("http://") ? (
+              ) : currentUrl.startsWith('http://') ? (
                 <svg
                   className="w-4 h-4 text-yellow-500 flex-shrink-0"
                   fill="none"
@@ -501,15 +441,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
             />
             {isFocused && inputValue && (
               <button
-                onClick={() => setInputValue("")}
+                onClick={() => setInputValue('')}
                 className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
               >
-                <svg
-                  className="w-3 h-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -529,9 +464,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
                   key={suggestion.url}
                   onClick={() => handleSuggestionClick(suggestion.url)}
                   className={`px-4 py-2 cursor-pointer transition-colors ${
-                    index === selectedSuggestionIndex
-                      ? "bg-accent"
-                      : "hover:bg-accent"
+                    index === selectedSuggestionIndex ? 'bg-accent' : 'hover:bg-accent'
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -549,12 +482,8 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
                       />
                     </svg>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {suggestion.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {suggestion.url}
-                      </div>
+                      <div className="text-sm font-medium truncate">{suggestion.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">{suggestion.url}</div>
                       {suggestion.visitCount && suggestion.visitCount > 1 && (
                         <div className="text-xs text-muted-foreground">
                           Visited {suggestion.visitCount} times
@@ -573,15 +502,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           onClick={handleToggleBookmark}
           disabled={!currentUrl}
           className={`p-2 rounded transition-colors ${
-            isBookmarked
-              ? "text-yellow-500 hover:bg-accent"
-              : "hover:bg-accent disabled:opacity-30"
+            isBookmarked ? 'text-yellow-500 hover:bg-accent' : 'hover:bg-accent disabled:opacity-30'
           }`}
-          title={isBookmarked ? "Remove bookmark" : "Add bookmark"}
+          title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
         >
           <svg
             className="w-5 h-5"
-            fill={isBookmarked ? "currentColor" : "none"}
+            fill={isBookmarked ? 'currentColor' : 'none'}
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
@@ -600,12 +527,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           className="p-2 rounded hover:bg-accent transition-colors"
           title="History (Ctrl+H)"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -621,12 +543,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           className="p-2 rounded hover:bg-accent transition-colors"
           title="Bookmarks (Ctrl+B)"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -640,18 +557,11 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
         <button
           onClick={toggleChat}
           className={`p-2 rounded transition-colors ${
-            isChatOpen
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-accent"
+            isChatOpen ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
           }`}
           title="Toggle AI Chat"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -667,12 +577,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           className="p-2 rounded hover:bg-accent transition-colors"
           title="More options"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -685,18 +590,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
 
       {/* Context Menu */}
       {showMenu && (
-        <ContextMenu
-          items={menuItems}
-          position={menuPosition}
-          onClose={() => setShowMenu(false)}
-        />
+        <ContextMenu items={menuItems} position={menuPosition} onClose={() => setShowMenu(false)} />
       )}
 
       {/* Page Title Bar */}
       {pageTitle && !isFocused && (
-        <div className="px-3 pb-1.5 text-xs text-muted-foreground truncate">
-          {pageTitle}
-        </div>
+        <div className="px-3 pb-1.5 text-xs text-muted-foreground truncate">{pageTitle}</div>
       )}
 
       {/* Loading Progress Bar */}

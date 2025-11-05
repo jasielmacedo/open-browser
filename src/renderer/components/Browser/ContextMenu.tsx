@@ -88,9 +88,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
             }}
             disabled={item.disabled}
             className={`w-full px-3 py-2 text-left text-sm flex items-center gap-3 transition-colors ${
-              item.disabled
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-accent cursor-pointer'
+              item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent cursor-pointer'
             }`}
           >
             {item.icon && <span className="w-4 h-4">{item.icon}</span>}

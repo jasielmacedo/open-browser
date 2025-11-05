@@ -20,12 +20,10 @@ const ALLOWED_INVOKE_CHANNELS = [
   'tabs:clear',
   'webview:openDevTools',
   'webview:print',
-  'webview:viewSource'
+  'webview:viewSource',
 ];
 
-const ALLOWED_LISTEN_CHANNELS = [
-  'open-view-source'
-];
+const ALLOWED_LISTEN_CHANNELS = ['open-view-source'];
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -62,7 +60,7 @@ contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,
 
   // App version (will be populated later)
-  version: '0.1.0'
+  version: '0.1.0',
 });
 
 // Type definitions for TypeScript
