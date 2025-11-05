@@ -13,7 +13,13 @@
       "Bash(npm uninstall:*)",
       "Read(//c/Users/jasie/OneDrive/Pictures/Screenshots/**)",
       "Bash(npx electron-builder install-app-deps)",
-      "Bash(npx electron-rebuild -f -w better-sqlite3)"
+      "Bash(npx electron-rebuild -f -w better-sqlite3)",
+      "Bash(git log:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(curl:*)",
+      "Bash(unzip:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

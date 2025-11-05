@@ -7,6 +7,7 @@ A Chromium-based browser with integrated local LLM capabilities, featuring multi
 ## Architecture Philosophy
 
 Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
+
 - **Separation of Concerns**: Browser rendering engine isolated from AI/UI layer
 - **Process Isolation**: Chromium runs in separate process from main app
 - **Async Operations**: LLM inference doesn't block browser functionality
@@ -87,6 +88,7 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
 ## Technology Stack
 
 ### Core Framework
+
 - **Electron** `^28.0.0+`
   - Main Process: Node.js runtime for system operations
   - Renderer Process: Chromium for UI rendering
@@ -94,6 +96,7 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
   - Node Integration: Disabled in renderer (use preload scripts)
 
 ### Frontend Stack
+
 - **React** `^18.2.0+`
   - Functional components with Hooks
   - Concurrent rendering for smooth UI
@@ -108,6 +111,7 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
   - Electron-vite for unified config
 
 ### UI/Styling
+
 - **Tailwind CSS** `^3.4.0+`
   - Utility-first styling
   - Dark mode support
@@ -118,6 +122,7 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
   - Customizable with Tailwind
 
 ### State Management
+
 - **Zustand** or **Jotai**
   - Lightweight (~1KB)
   - No boilerplate
@@ -128,9 +133,13 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
     - `modelStore`: Available models, download progress
 
 ### LLM Integration
-- **Ollama** (HTTP API)
-  - Version: `0.1.0+`
+
+- **Ollama** (Bundled HTTP API)
+  - Version: `0.12.9+`
   - Default Port: `11434`
+  - **Bundled with Application**: No separate installation required
+  - Platform Support: Windows (x64) and macOS (Intel/Apple Silicon)
+  - Auto-starts with application
   - API Endpoints:
     - `POST /api/generate` - Streaming inference
     - `POST /api/chat` - Chat completion
@@ -140,6 +149,7 @@ Inspired by OpenAI Atlas' OWL (OpenAI's Web Layer) architecture:
   - Model Format: GGUF (llama.cpp compatible)
 
 ### Additional Libraries
+
 - **@mozilla/readability** - Article extraction from HTML
 - **sharp** - Image processing/optimization (main process)
 - **marked** - Markdown parsing for chat messages
@@ -214,6 +224,9 @@ browser-llm/
 │       └── models.json                   # Pre-configured model registry
 │
 ├── resources/                            # App icons & assets
+│   └── bin/                              # Bundled Ollama executables
+│       ├── win32/                        # Windows Ollama (ollama.exe + libs)
+│       └── darwin/                       # macOS Ollama (Ollama.app)
 ├── dist/                                 # Build output (gitignored)
 ├── node_modules/                         # Dependencies (gitignored)
 │
@@ -305,7 +318,9 @@ browser-llm/
 ```
 
 ### Custom Model Schema
+
 Users can add models via URL with automatic schema detection:
+
 ```json
 {
   "id": "custom-model-uuid",
@@ -319,6 +334,7 @@ Users can add models via URL with automatic schema detection:
 ## Storage Architecture
 
 ### Directory Structure
+
 ```
 User Data Directory (app.getPath('userData'))
 ├── models/                           # Ollama model storage (symlink/config)
@@ -340,6 +356,7 @@ Linux:   ~/.ollama/models/
 ```
 
 ### Model Storage Flow
+
 1. User requests model download
 2. App calls Ollama API: `POST /api/pull`
 3. Ollama downloads to its own directory (`.ollama/models`)
@@ -357,8 +374,13 @@ class OllamaService {
   private baseURL = 'http://localhost:11434';
 
   async start(): Promise<void> {
-    // Spawn ollama serve process
-    this.process = spawn('ollama', ['serve']);
+    // Get bundled Ollama executable path
+    const ollamaPath = this.getBundledOllamaPath();
+
+    // Spawn bundled ollama serve process
+    this.process = spawn(ollamaPath, ['serve'], {
+      env: { ...process.env, PATH: `${libPath};${process.env.PATH}` },
+    });
     await this.waitForReady();
   }
 
@@ -381,7 +403,7 @@ class OllamaService {
     const response = await fetch(`${this.baseURL}/api/pull`, {
       method: 'POST',
       body: JSON.stringify({ name: modelName }),
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
 
     const reader = response.body.getReader();
@@ -408,8 +430,8 @@ class OllamaService {
         model,
         prompt,
         images: [imageBase64],
-        stream: true
-      })
+        stream: true,
+      }),
     });
 
     const reader = response.body.getReader();
@@ -434,9 +456,7 @@ class OllamaService {
 ```typescript
 // main/services/capture.ts
 class CaptureService {
-  async capturePageScreenshot(
-    webContents: Electron.WebContents
-  ): Promise<Buffer> {
+  async capturePageScreenshot(webContents: Electron.WebContents): Promise<Buffer> {
     const image = await webContents.capturePage();
 
     // Optimize for LLM input
@@ -446,9 +466,7 @@ class CaptureService {
       .toBuffer();
   }
 
-  async extractPageText(
-    webContents: Electron.WebContents
-  ): Promise<string> {
+  async extractPageText(webContents: Electron.WebContents): Promise<string> {
     const result = await webContents.executeJavaScript(`
       (function() {
         const { Readability } = require('@mozilla/readability');
@@ -469,12 +487,12 @@ class CaptureService {
   ): Promise<{ image: string; context: string }> {
     const [screenshot, text] = await Promise.all([
       this.capturePageScreenshot(webContents),
-      this.extractPageText(webContents)
+      this.extractPageText(webContents),
     ]);
 
     return {
       image: screenshot.toString('base64'),
-      context: text
+      context: text,
     };
   }
 }
@@ -484,10 +502,7 @@ class CaptureService {
 
 ```typescript
 // main/ipc/handlers.ts
-export function registerIPCHandlers(
-  ollamaService: OllamaService,
-  captureService: CaptureService
-) {
+export function registerIPCHandlers(ollamaService: OllamaService, captureService: CaptureService) {
   // Model management
   ipcMain.handle('models:list', async () => {
     return await ollamaService.listModels();
@@ -516,15 +531,9 @@ export function registerIPCHandlers(
       context = captured.context;
     }
 
-    const fullPrompt = context
-      ? `${prompt}\n\nPage context:\n${context}`
-      : prompt;
+    const fullPrompt = context ? `${prompt}\n\nPage context:\n${context}` : prompt;
 
-    const generator = ollamaService.generateWithVision(
-      model,
-      fullPrompt,
-      imageBase64
-    );
+    const generator = ollamaService.generateWithVision(model, fullPrompt, imageBase64);
 
     for await (const token of generator) {
       event.sender.send('chat:token', token);
@@ -552,7 +561,7 @@ export function useIPC() {
     },
     onChatToken: (callback: (token: string) => void) => {
       window.electron.on('chat:token', callback);
-    }
+    },
   };
 }
 ```
@@ -560,25 +569,30 @@ export function useIPC() {
 ## UI/UX Patterns
 
 ### Mode Toggle Behavior
+
 - **Browse Mode**: URL bar accepts URLs, navigation works normally
 - **Chat Mode**: URL bar becomes prompt input, triggers LLM inference
 - **Toggle**: Keyboard shortcut (Cmd/Ctrl+K) or button click
 - **Visual Indicator**: Icon badge, color change, or label showing active mode
 
 ### Home Page (Initial State)
+
 - Chat interface front and center
 - Model selector prominent
 - Quick actions: "Analyze this page", "Summarize", "Answer question"
 - Recent conversations (optional)
 
 ### Context Menu Integration
+
 Right-click on page:
+
 - "Ask AI about this page"
 - "Explain selected text"
 - "Summarize page"
 - Triggers capture + chat in sidebar/overlay
 
 ### Streaming Response Display
+
 ```
 User: What's on this page?
 Assistant: ▊                    <- Cursor blinks while streaming
@@ -589,12 +603,14 @@ Assistant: This page contains an article about...▊
 ## Performance Considerations
 
 ### Image Optimization
+
 - Resize to model's input resolution (typically 336x336 or 448x448)
 - Compress to JPEG at 85% quality
 - Remove alpha channel (convert RGBA → RGB)
 - Target: <200KB per image
 
 ### Memory Management
+
 ```
 Component Memory Budget:
 - Electron base: ~150MB
@@ -608,6 +624,7 @@ Total for 7B model: ~6-7GB RAM
 ```
 
 ### Inference Performance
+
 ```
 CPU (Apple M1/M2, AMD Ryzen 7+):
 - 7B Q4: ~3-5 tokens/sec
@@ -623,6 +640,7 @@ Latency targets:
 ```
 
 ### Optimization Strategies
+
 1. **Lazy Load Models**: Download on first use, not at startup
 2. **Background Downloads**: Non-blocking model pulls
 3. **Image Caching**: Reuse screenshots for follow-up questions
@@ -632,16 +650,17 @@ Latency targets:
 ## Security Considerations
 
 ### Electron Security Best Practices
+
 ```typescript
 // main/index.ts
 const mainWindow = new BrowserWindow({
   webPreferences: {
-    nodeIntegration: false,           // Disable Node in renderer
-    contextIsolation: true,            // Isolate preload context
-    sandbox: true,                     // Enable sandbox
-    webSecurity: true,                 // Enforce same-origin
-    preload: path.join(__dirname, 'preload.js')
-  }
+    nodeIntegration: false, // Disable Node in renderer
+    contextIsolation: true, // Isolate preload context
+    sandbox: true, // Enable sandbox
+    webSecurity: true, // Enforce same-origin
+    preload: path.join(__dirname, 'preload.js'),
+  },
 });
 
 // Content Security Policy
@@ -654,14 +673,15 @@ mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) 
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
-        "connect-src 'self' http://localhost:11434"
-      ]
-    }
+        "connect-src 'self' http://localhost:11434",
+      ],
+    },
   });
 });
 ```
 
 ### WebView Isolation
+
 ```typescript
 // renderer/components/Browser/WebView.tsx
 <webview
@@ -673,6 +693,7 @@ mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) 
 ```
 
 ### Model Download Verification
+
 ```typescript
 async function verifyModelChecksum(filePath: string, expectedSHA256: string): Promise<boolean> {
   const hash = crypto.createHash('sha256');
@@ -689,64 +710,78 @@ async function verifyModelChecksum(filePath: string, expectedSHA256: string): Pr
 ## Build & Distribution
 
 ### Development
+
 ```bash
-pnpm install
-pnpm dev          # Start dev server with hot reload
+npm install
+npm run dev       # Start dev server with hot reload
+                  # Ollama starts automatically (bundled)
 ```
 
 ### Production Build
+
 ```bash
-pnpm build        # Compile TypeScript + bundle
-pnpm package      # Create distributable (dmg/exe/AppImage)
+npm run build     # Compile TypeScript + bundle
+npm run package   # Create distributable with bundled Ollama
+                  # Output includes ~1.8GB Ollama executable + libs
 ```
 
 ### electron-builder Configuration
+
 ```json
 {
   "appId": "com.browserllm.app",
   "productName": "Browser-LLM",
   "directories": {
-    "output": "dist"
+    "output": "build",
+    "buildResources": "resources"
   },
-  "files": [
-    "build/**/*",
-    "node_modules/**/*",
-    "package.json"
+  "files": ["dist/**/*", "package.json"],
+  "extraResources": [
+    {
+      "from": "resources/bin",
+      "to": "bin",
+      "filter": ["**/*", "!*.zip"]
+    }
   ],
   "mac": {
-    "target": ["dmg", "zip"],
+    "target": ["dmg"],
     "category": "public.app-category.productivity",
-    "hardenedRuntime": true,
-    "entitlements": "build/entitlements.mac.plist"
+    "icon": "resources/icon.icns"
   },
   "win": {
-    "target": ["nsis", "portable"],
+    "target": ["nsis"],
     "icon": "resources/icon.ico"
   },
-  "linux": {
-    "target": ["AppImage", "deb"],
-    "category": "Network"
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
   }
 }
 ```
 
+**Note**: The `extraResources` configuration bundles Ollama executables with the application. The final installer size will be approximately 1.8GB on Windows due to the included Ollama binary and GPU acceleration libraries (CUDA, etc.).
+
 ## Environment Requirements
 
 ### Development
+
 - Node.js 18+ (LTS recommended)
-- pnpm 8+ (or npm/yarn)
-- Ollama installed and in PATH
+- npm, pnpm, or yarn
 - 8GB+ RAM (for running models during dev)
 - TypeScript 5.3+
+- **No Ollama installation required** (bundled with app)
 
 ### User System Requirements
+
 **Minimum (Moondream 2B)**:
+
 - OS: Windows 10+, macOS 11+, Ubuntu 20.04+
 - RAM: 4GB
 - Storage: 5GB free space
 - CPU: Dual-core 2GHz+
 
 **Recommended (BakLLaVA 7B)**:
+
 - OS: Windows 11, macOS 12+, Ubuntu 22.04+
 - RAM: 8GB+
 - Storage: 10GB free space
@@ -756,17 +791,20 @@ pnpm package      # Create distributable (dmg/exe/AppImage)
 ## Key Differentiators
 
 ### vs Traditional Browsers
+
 - Local AI integration (no cloud dependency)
 - Privacy-first (all inference happens locally)
 - Chat-first interface option
 
 ### vs Cloud AI Browsers (Arc, Atlas)
+
 - No API costs
 - Offline capable (once models downloaded)
 - Full data privacy
 - Unlimited queries
 
 ### vs LLM Clients (LM Studio, Jan.ai)
+
 - Integrated browsing (not just chat)
 - Vision models see actual pages
 - Direct web interaction
@@ -774,6 +812,7 @@ pnpm package      # Create distributable (dmg/exe/AppImage)
 ## Future Extensibility
 
 ### Potential Enhancements
+
 - [ ] Multi-modal output (TTS for responses)
 - [ ] Page automation via LLM (playwright integration)
 - [ ] Local embeddings for semantic search across history
@@ -784,6 +823,7 @@ pnpm package      # Create distributable (dmg/exe/AppImage)
 - [ ] RAG (Retrieval-Augmented Generation) for personal knowledge
 
 ### Architecture Scalability
+
 - Service-based design allows swapping Ollama for alternatives
 - IPC layer abstracts communication (easy to add new features)
 - React component architecture supports theming/customization
@@ -792,17 +832,20 @@ pnpm package      # Create distributable (dmg/exe/AppImage)
 ## References & Resources
 
 ### Documentation
+
 - Electron: https://www.electronjs.org/docs
 - Ollama API: https://github.com/ollama/ollama/blob/main/docs/api.md
 - llama.cpp: https://github.com/ggerganov/llama.cpp
 - GGUF format: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
 
 ### Model Sources
+
 - Hugging Face: https://huggingface.co/models?library=gguf
 - Ollama Library: https://ollama.ai/library
 - LM Studio Community: https://lmstudio.ai/models
 
 ### Inspiration
+
 - OpenAI Atlas: https://openai.com/index/introducing-chatgpt-atlas/
 - Arc Browser: https://arc.net
 - LM Studio: https://lmstudio.ai

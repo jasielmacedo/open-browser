@@ -48,3 +48,6 @@ coverage/
 # Ollama models (user data)
 models/
 conversations/
+
+# Ollama binaries (large files, downloaded via script)
+resources/bin/

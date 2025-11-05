@@ -2,9 +2,22 @@
 
 A Chromium-based browser with integrated local LLM capabilities for intelligent web interaction.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/screenshot-1.png" alt="Open Browser Screenshot 1" width="48%">
+  <img src="screenshots/screenshot-2.png" alt="Open Browser Screenshot 2" width="48%">
+</p>
+
+<p align="center">
+  <img src="screenshots/screenshot-3.png" alt="Open Browser Screenshot 3" width="48%">
+  <img src="screenshots/screenshot-4.png" alt="Open Browser Screenshot 4" width="48%">
+</p>
+
 ## Features
 
 ### Currently Available
+
 - 🌐 Full-featured Chromium browser with multi-tab support
 - 📑 Tab management with keyboard shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab)
 - 🔍 Navigation controls (back, forward, reload, home)
@@ -24,6 +37,7 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - ⭐ Default model selection and persistent settings
 
 ### Planned Features
+
 - 🖼️ Vision model integration for screenshot analysis
 - 📊 AI-powered page summarization and content extraction
 - 📥 Model management UI with progress tracking
@@ -41,7 +55,7 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - **Axios** - HTTP client for Ollama API communication
 - **ESLint + Prettier** - Code quality and formatting
 - **Husky** - Git hooks for pre-commit checks
-- **Ollama** - Local LLM inference engine
+- **Ollama** - Local LLM inference engine (v0.12.9 bundled with application)
 
 ## Development
 
@@ -49,29 +63,53 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 
 - Node.js 18+ (LTS recommended)
 - npm or pnpm
-- Ollama installed ([ollama.com](https://ollama.com)) - Required for AI features
+
+**Note:** Ollama is bundled with the application - no separate installation required!
 
 ### Getting Started
 
 ```bash
 # Install dependencies
+# This automatically downloads Ollama binaries (~1.8GB)
 npm install
 
-# Start Ollama (required for AI features)
-ollama serve
-
-# Pull a model (optional, for testing AI features)
-ollama pull llama2
+# If you need to manually download/update Ollama binaries
+npm run setup:ollama
 
 # Start development server
+# Ollama will start automatically with the app
 npm run dev
 
 # Build for production
 npm run build
 
-# Package as distributable
+# Package as distributable (includes Ollama)
 npm run package
 ```
+
+**First-time setup:**
+
+- When you run `npm install`, the Ollama binaries will be automatically downloaded
+- This is a one-time download of ~1.8GB (includes Windows and macOS versions)
+- The binaries are stored in `resources/bin/` (excluded from git)
+
+### Using AI Features
+
+The application includes **Ollama v0.12.9** bundled for both Windows and macOS. When you first run the app:
+
+1. Ollama starts automatically in the background
+2. Click the Model Manager button in the navigation bar (or press Ctrl/Cmd+M)
+3. Download your preferred model (e.g., llama3.2, qwen2.5)
+4. Start chatting with AI or analyzing web pages!
+
+No manual Ollama installation or configuration needed.
+
+#### Bundled Ollama Version
+
+- **Version**: 0.12.9 (Released: November 1, 2025)
+- **Platforms**: Windows (x64), macOS (Intel + Apple Silicon)
+- **Size**: ~1.8GB (includes CUDA, ROCm support for GPU acceleration)
+- **Update Instructions**: To update Ollama, download the latest release from [ollama/ollama/releases](https://github.com/ollama/ollama/releases) and replace files in `resources/bin/`
 
 ## Project Structure
 
@@ -94,6 +132,7 @@ open-browser/
 ## Documentation
 
 See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documentation including:
+
 - Architecture diagrams
 - API integration patterns
 - Model registry format
@@ -105,6 +144,7 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 🚀 **Active Development** - Core browser features implemented, AI integration in progress
 
 ### Completed
+
 - [x] Electron + React + TypeScript setup
 - [x] Vite build configuration with HMR
 - [x] Security hardening implementation
@@ -129,6 +169,7 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 - [x] Chat and Model state management with Zustand
 
 ### In Progress / Planned
+
 - [ ] Vision model integration for screenshot and page analysis
 - [ ] Content capture service for page context extraction
 - [ ] AI-powered page summarization with readability
@@ -137,25 +178,25 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl/Cmd + T` | New tab |
-| `Ctrl/Cmd + W` | Close current tab |
-| `Ctrl + Tab` | Switch to next tab |
-| `Ctrl + Shift + Tab` | Switch to previous tab |
-| `Ctrl/Cmd + R` or `F5` | Reload page |
-| `Ctrl/Cmd + H` | Toggle history sidebar |
-| `Ctrl/Cmd + B` | Toggle bookmarks sidebar |
-| `Ctrl/Cmd + M` | Open model manager |
-| `Alt + Left` | Go back |
-| `Alt + Right` | Go forward |
-| `Ctrl/Cmd + Plus` | Zoom in |
-| `Ctrl/Cmd + Minus` | Zoom out |
-| `Ctrl/Cmd + 0` | Reset zoom |
-| `Ctrl/Cmd + P` | Print page |
-| `Ctrl/Cmd + U` | View page source |
-| `F12` | Open developer tools |
-| `Escape` | Stop page loading |
+| Shortcut               | Action                   |
+| ---------------------- | ------------------------ |
+| `Ctrl/Cmd + T`         | New tab                  |
+| `Ctrl/Cmd + W`         | Close current tab        |
+| `Ctrl + Tab`           | Switch to next tab       |
+| `Ctrl + Shift + Tab`   | Switch to previous tab   |
+| `Ctrl/Cmd + R` or `F5` | Reload page              |
+| `Ctrl/Cmd + H`         | Toggle history sidebar   |
+| `Ctrl/Cmd + B`         | Toggle bookmarks sidebar |
+| `Ctrl/Cmd + M`         | Open model manager       |
+| `Alt + Left`           | Go back                  |
+| `Alt + Right`          | Go forward               |
+| `Ctrl/Cmd + Plus`      | Zoom in                  |
+| `Ctrl/Cmd + Minus`     | Zoom out                 |
+| `Ctrl/Cmd + 0`         | Reset zoom               |
+| `Ctrl/Cmd + P`         | Print page               |
+| `Ctrl/Cmd + U`         | View page source         |
+| `F12`                  | Open developer tools     |
+| `Escape`               | Stop page loading        |
 
 ## Contributing
 
@@ -164,14 +205,19 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ### Development Guidelines
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run linting and formatting: `npm run lint:fix && npm run format`
-5. Commit your changes with a descriptive message
-6. Push to your branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+2. Clone your fork: `git clone https://github.com/your-username/browser-llm.git`
+3. Install dependencies: `npm install` (this will download Ollama binaries automatically)
+4. Create your feature branch (`git checkout -b feature/amazing-feature`)
+5. Make your changes
+6. Run linting and formatting: `npm run lint:fix && npm run format`
+7. Commit your changes with a descriptive message
+8. Push to your branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request
+
+**Note:** The `resources/bin/` directory is excluded from git. Contributors will automatically download Ollama binaries when running `npm install`.
 
 The project uses:
+
 - **ESLint** for code linting
 - **Prettier** for code formatting
 - **Husky** for pre-commit hooks

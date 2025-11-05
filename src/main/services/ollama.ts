@@ -1,5 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 import { spawn, ChildProcess } from 'child_process';
+import { app } from 'electron';
+import path from 'path';
+import fs from 'fs';
 
 export interface OllamaModel {
   name: string;
@@ -62,6 +65,66 @@ export class OllamaService {
   }
 
   /**
+   * Get the path to the bundled Ollama executable
+   */
+  private getBundledOllamaPath(): string | null {
+    const isPackaged = app.isPackaged;
+    const platform = process.platform;
+
+    let ollamaPath: string;
+
+    if (isPackaged) {
+      // In production, use resources/bin from app resources
+      const resourcesPath = process.resourcesPath;
+      if (platform === 'win32') {
+        ollamaPath = path.join(resourcesPath, 'bin', 'win32', 'ollama.exe');
+      } else if (platform === 'darwin') {
+        ollamaPath = path.join(
+          resourcesPath,
+          'bin',
+          'darwin',
+          'Ollama.app',
+          'Contents',
+          'Resources',
+          'ollama'
+        );
+      } else {
+        console.error('Unsupported platform:', platform);
+        return null;
+      }
+    } else {
+      // In development, use resources/bin from project root
+      const appPath = app.getAppPath();
+      if (platform === 'win32') {
+        ollamaPath = path.join(appPath, 'resources', 'bin', 'win32', 'ollama.exe');
+      } else if (platform === 'darwin') {
+        ollamaPath = path.join(
+          appPath,
+          'resources',
+          'bin',
+          'darwin',
+          'Ollama.app',
+          'Contents',
+          'Resources',
+          'ollama'
+        );
+      } else {
+        console.error('Unsupported platform:', platform);
+        return null;
+      }
+    }
+
+    // Check if the file exists
+    if (fs.existsSync(ollamaPath)) {
+      console.log('Found bundled Ollama at:', ollamaPath);
+      return ollamaPath;
+    } else {
+      console.error('Bundled Ollama not found at:', ollamaPath);
+      return null;
+    }
+  }
+
+  /**
    * Check if Ollama server is running
    */
   async isRunning(): Promise<boolean> {
@@ -69,7 +132,7 @@ export class OllamaService {
       const response = await this.client.get('/api/version', { timeout: 3000 });
       this.isServerRunning = response.status === 200;
       return this.isServerRunning;
-    } catch (error) {
+    } catch (_error) {
       this.isServerRunning = false;
       return false;
     }
@@ -86,15 +149,32 @@ export class OllamaService {
 
     return new Promise((resolve, reject) => {
       try {
-        // Spawn ollama serve process
-        this.process = spawn('ollama', ['serve'], {
+        // Get bundled Ollama path
+        const ollamaPath = this.getBundledOllamaPath();
+        if (!ollamaPath) {
+          reject(new Error('Bundled Ollama executable not found. Please check the installation.'));
+          return;
+        }
+
+        console.log('Starting Ollama from:', ollamaPath);
+
+        // Set environment variables for Windows to use the bundled libs
+        const env = { ...process.env };
+        if (process.platform === 'win32') {
+          const libPath = path.join(path.dirname(ollamaPath), 'lib', 'ollama');
+          env.PATH = `${libPath};${env.PATH}`;
+        }
+
+        // Spawn ollama serve process with bundled executable
+        this.process = spawn(ollamaPath, ['serve'], {
           stdio: 'pipe',
           detached: false,
+          env,
         });
 
         this.process.on('error', (error) => {
           console.error('Failed to start Ollama:', error);
-          reject(new Error('Failed to start Ollama. Make sure Ollama is installed.'));
+          reject(new Error('Failed to start Ollama. Please check the installation.'));
         });
 
         // Wait for server to be ready
@@ -187,7 +267,7 @@ export class OllamaService {
               if (progress.status === 'success' || progress.status === 'complete') {
                 return;
               }
-            } catch (e) {
+            } catch (_e) {
               console.warn('Failed to parse progress line:', line);
             }
           }
@@ -248,7 +328,7 @@ export class OllamaService {
               if (data.done) {
                 return;
               }
-            } catch (e) {
+            } catch (_e) {
               console.warn('Failed to parse response line:', line);
             }
           }
@@ -293,7 +373,7 @@ export class OllamaService {
               if (data.done) {
                 return;
               }
-            } catch (e) {
+            } catch (_e) {
               console.warn('Failed to parse chat response line:', line);
             }
           }
