@@ -19,11 +19,11 @@ export function isUrlSafe(url: string): boolean {
     const allowedProtocols = [
       'http:',
       'https:',
-      'view-source:' // Used for viewing page source
+      'view-source:', // Used for viewing page source
     ];
 
     return allowedProtocols.includes(protocol);
-  } catch (error) {
+  } catch {
     // Invalid URL format
     return false;
   }
@@ -36,7 +36,7 @@ export function validateUrl(url: string, context: string = 'URL'): string {
   if (!isUrlSafe(url)) {
     throw new Error(
       `${context} validation failed: URL '${url}' uses an unsafe or invalid protocol. ` +
-      'Only http://, https://, and view-source: URLs are allowed.'
+        'Only http://, https://, and view-source: URLs are allowed.'
     );
   }
   return url;
@@ -55,11 +55,7 @@ export function validatePositiveInteger(value: any, fieldName: string): number {
 /**
  * Validates that a value is a string and optionally checks length
  */
-export function validateString(
-  value: any,
-  fieldName: string,
-  maxLength?: number
-): string {
+export function validateString(value: any, fieldName: string, maxLength?: number): string {
   if (typeof value !== 'string') {
     throw new Error(`${fieldName} must be a string`);
   }

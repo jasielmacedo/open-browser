@@ -4,7 +4,7 @@ import {
   validateUrl,
   validatePositiveInteger,
   validateString,
-  validateBoolean
+  validateBoolean,
 } from '../utils/validation';
 
 export function registerIpcHandlers() {
@@ -227,12 +227,12 @@ export function registerIpcHandlers() {
   });
 
   // Webview control handlers
-  ipcMain.handle('webview:openDevTools', async (event) => {
+  ipcMain.handle('webview:openDevTools', async (_event) => {
     // The webview will handle this via executeJavaScript
     return true;
   });
 
-  ipcMain.handle('webview:print', async (event) => {
+  ipcMain.handle('webview:print', async (_event) => {
     // The webview will handle this via print()
     return true;
   });

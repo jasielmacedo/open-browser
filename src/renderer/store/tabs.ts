@@ -38,12 +38,14 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       lastActiveTime: Date.now(),
     };
 
-    set(state => ({
-      tabs: state.tabs.map(tab => ({
-        ...tab,
-        isActive: false,
-        lastActiveTime: tab.lastActiveTime || Date.now(),
-      })).concat(newTab),
+    set((state) => ({
+      tabs: state.tabs
+        .map((tab) => ({
+          ...tab,
+          isActive: false,
+          lastActiveTime: tab.lastActiveTime || Date.now(),
+        }))
+        .concat(newTab),
       activeTabId: newTab.id,
     }));
 
@@ -53,10 +55,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   closeTab: (tabId: string) => {
     const state = get();
-    const tabIndex = state.tabs.findIndex(t => t.id === tabId);
+    const tabIndex = state.tabs.findIndex((t) => t.id === tabId);
     if (tabIndex === -1) return;
 
-    const newTabs = state.tabs.filter(t => t.id !== tabId);
+    const newTabs = state.tabs.filter((t) => t.id !== tabId);
 
     // If closing the last tab, create a new empty tab
     if (newTabs.length === 0) {
@@ -86,8 +88,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   setActiveTab: (tabId: string) => {
-    set(state => ({
-      tabs: state.tabs.map(tab => ({
+    set((state) => ({
+      tabs: state.tabs.map((tab) => ({
         ...tab,
         isActive: tab.id === tabId,
         isSuspended: tab.id === tabId ? false : tab.isSuspended,
@@ -101,10 +103,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   updateTab: (tabId: string, updates: Partial<Tab>) => {
-    set(state => ({
-      tabs: state.tabs.map(tab =>
-        tab.id === tabId ? { ...tab, ...updates } : tab
-      ),
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...updates } : tab)),
     }));
 
     // Debounced save (title/url updates happen frequently)
@@ -125,7 +125,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   getActiveTab: () => {
     const state = get();
-    return state.tabs.find(t => t.id === state.activeTabId);
+    return state.tabs.find((t) => t.id === state.activeTabId);
   },
 
   loadTabs: async () => {
@@ -141,7 +141,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         // No saved tabs, create a new one
         get().addTab();
       }
-    } catch (err) {
+    } catch {
       // Silently create default tab if IPC not ready yet
       if (!get().tabs.length) {
         get().addTab();
@@ -153,7 +153,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     try {
       const { tabs } = get();
       await window.electron.invoke('tabs:save', tabs);
-    } catch (err) {
+    } catch {
       // Silently fail - IPC handlers may not be ready yet
     }
   },
@@ -162,8 +162,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const SUSPEND_AFTER_MS = 10 * 60 * 1000; // 10 minutes
     const now = Date.now();
 
-    set(state => ({
-      tabs: state.tabs.map(tab => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
         // Don't suspend active tab
         if (tab.isActive) return tab;
 
@@ -182,8 +182,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   unsuspendTab: (tabId: string) => {
-    set(state => ({
-      tabs: state.tabs.map(tab =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
         tab.id === tabId ? { ...tab, isSuspended: false, lastActiveTime: Date.now() } : tab
       ),
     }));
