@@ -59,6 +59,8 @@ export const ChatSidebar: React.FC = () => {
     if (isChatOpen) {
       checkOllama();
     }
+    // Only run when chat opens - intentionally not including other deps to avoid re-fetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isChatOpen]);
 
   // Auto-scroll to bottom on new messages

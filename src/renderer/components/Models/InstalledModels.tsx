@@ -11,16 +11,21 @@ export const InstalledModels: React.FC = () => {
   };
 
   const handleDelete = async (modelName: string) => {
-    if (!confirm(`Are you sure you want to delete "${modelName}"?`)) {
-      return;
-    }
+    // Simple confirmation - consider replacing with a proper modal in the future
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${modelName}"?\n\nThis will remove the model from your system.`
+    );
+
+    if (!confirmed) return;
 
     setDeletingModel(modelName);
     try {
       await window.electron.invoke('ollama:deleteModel', modelName);
       await refreshModels();
     } catch (error: any) {
-      alert(`Failed to delete model: ${error.message}`);
+      console.error('Failed to delete model:', error);
+      // TODO: Replace with toast notification
+      window.alert(`Failed to delete model: ${error.message}`);
     } finally {
       setDeletingModel(null);
     }
@@ -176,7 +181,7 @@ export const InstalledModels: React.FC = () => {
                   <button
                     onClick={() => handleDelete(model.name)}
                     disabled={isDeleting}
-                    className="px-4 py-2 text-sm bg-destructive/10 text-destructive rounded hover:bg-destructive/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+                    className="px-4 py-2 text-sm bg-red-500/10 text-red-600 dark:text-red-400 rounded hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap"
                     title="Delete this model"
                   >
                     {isDeleting ? 'Deleting...' : 'Delete'}

@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useModelStore } from '../../store/models';
 import { getAvailableModels, getCapabilityBadges } from '../../../shared/modelRegistry';
-import type { ModelMetadata } from '../../../shared/types';
+import type { ModelMetadata, PullProgress } from '../../../shared/types';
 
 export const AvailableModels: React.FC = () => {
-  const { models, pullProgress, isPulling, setIsPulling, setPullProgress, clearPullProgress, refreshModels } = useModelStore();
+  const {
+    models,
+    pullProgress,
+    isPulling,
+    setIsPulling,
+    setPullProgress,
+    clearPullProgress,
+    refreshModels,
+    setError,
+  } = useModelStore();
   const [availableModels, setAvailableModels] = useState<ModelMetadata[]>([]);
   const [filter, setFilter] = useState<'all' | 'vision' | 'text'>('all');
 
@@ -16,31 +25,33 @@ export const AvailableModels: React.FC = () => {
   const handlePull = async (modelName: string) => {
     setIsPulling(true);
 
+    // Set up progress listener
+    const unsubscribe = window.electron.on('ollama:pullProgress', (progress: PullProgress) => {
+      setPullProgress(modelName, progress);
+
+      // If pull completed, refresh models and clear progress
+      if (progress.status === 'success' || progress.status === 'complete') {
+        setTimeout(async () => {
+          await refreshModels();
+          clearPullProgress(modelName);
+          setIsPulling(false);
+        }, 1000);
+      }
+    });
+
     try {
-      // Set up progress listener
-      const unsubscribe = window.electron.on('ollama:pullProgress', (progress: any) => {
-        setPullProgress(modelName, progress);
-
-        // If pull completed, refresh models and clear progress
-        if (progress.status === 'success' || progress.status === 'complete') {
-          setTimeout(async () => {
-            await refreshModels();
-            clearPullProgress(modelName);
-          }, 1000);
-        }
-      });
-
-      // Start pull
+      // Start pull - this will stream progress events
       await window.electron.invoke('ollama:pullModel', modelName);
-
-      // Cleanup
-      unsubscribe();
     } catch (error: any) {
       console.error('Failed to pull model:', error);
-      alert(`Failed to download model: ${error.message}`);
+      setError(error.message || 'Failed to download model');
       clearPullProgress(modelName);
-    } finally {
       setIsPulling(false);
+    } finally {
+      // Cleanup listener after a delay to catch final events
+      setTimeout(() => {
+        unsubscribe();
+      }, 2000);
     }
   };
 
@@ -149,7 +160,7 @@ interface ModelCardProps {
   model: ModelMetadata;
   onPull: (modelName: string) => void;
   isPulling: boolean;
-  progress?: any;
+  progress?: PullProgress;
 }
 
 const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progress }) => {
