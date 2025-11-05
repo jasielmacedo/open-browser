@@ -181,7 +181,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  // AI context handler
+  // AI context handlers
   ipcMain.handle('browsing:getContext', async (event, limit?: number) => {
     try {
       if (limit !== undefined) {
@@ -190,6 +190,43 @@ export function registerIpcHandlers() {
       return databaseService.getBrowsingContext(limit);
     } catch (error: any) {
       console.error('browsing:getContext validation error:', error.message);
+      throw error;
+    }
+  });
+
+  // Get current page context (URL, title, selected text, etc.)
+  ipcMain.handle('page:getContext', async (event, pageInfo: any) => {
+    try {
+      // Validate page info
+      if (!pageInfo || typeof pageInfo !== 'object') {
+        return { url: '', title: '' }; // Return empty context if invalid
+      }
+
+      const context: any = {};
+
+      if (pageInfo.url) {
+        validateString(pageInfo.url, 'Page URL', 2048);
+        context.url = pageInfo.url;
+      }
+
+      if (pageInfo.title) {
+        validateString(pageInfo.title, 'Page title', 1024);
+        context.title = pageInfo.title;
+      }
+
+      if (pageInfo.selectedText) {
+        validateString(pageInfo.selectedText, 'Selected text', 50000);
+        context.selectedText = pageInfo.selectedText;
+      }
+
+      if (pageInfo.content) {
+        validateString(pageInfo.content, 'Page content', 100000);
+        context.content = pageInfo.content;
+      }
+
+      return context;
+    } catch (error: any) {
+      console.error('page:getContext validation error:', error.message);
       throw error;
     }
   });
@@ -322,12 +359,23 @@ export function registerIpcHandlers() {
         validateString(options.system, 'System prompt', 10000);
       }
 
+      // Validate context if provided
+      if (options.context) {
+        if (options.context.page?.url) {
+          validateString(options.context.page.url, 'Page URL', 2048);
+        }
+        if (options.context.page?.title) {
+          validateString(options.context.page.title, 'Page title', 1024);
+        }
+      }
+
       // Stream response tokens back to renderer
       const generator = ollamaService.generate({
         model: options.model,
         prompt: options.prompt,
         images: options.images,
         system: options.system,
+        context: options.context,
         stream: true,
       });
 
@@ -365,10 +413,21 @@ export function registerIpcHandlers() {
         }
       }
 
+      // Validate context if provided
+      if (options.context) {
+        if (options.context.page?.url) {
+          validateString(options.context.page.url, 'Page URL', 2048);
+        }
+        if (options.context.page?.title) {
+          validateString(options.context.page.title, 'Page title', 1024);
+        }
+      }
+
       // Stream response tokens back to renderer
       const generator = ollamaService.chat({
         model: options.model,
         messages: options.messages,
+        context: options.context,
         stream: true,
       });
 
