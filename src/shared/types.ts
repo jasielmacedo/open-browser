@@ -86,6 +86,7 @@ export interface PullProgress {
   completed?: number;
   total?: number;
   digest?: string;
+  error?: string;
 }
 
 export interface ChatMessage {
@@ -103,14 +104,30 @@ export interface Conversation {
   updatedAt: number;
 }
 
+export interface PageContext {
+  url?: string;
+  title?: string;
+  content?: string;
+  selectedText?: string;
+  screenshot?: string;
+}
+
+export interface AIContext {
+  page?: PageContext;
+  browsingHistory?: HistoryEntry[];
+  bookmarks?: Bookmark[];
+}
+
 export interface GenerateOptions {
   model: string;
   prompt: string;
   images?: string[];
   system?: string;
+  context?: AIContext;
 }
 
 export interface ChatOptions {
   model: string;
   messages: ChatMessage[];
+  context?: AIContext;
 }

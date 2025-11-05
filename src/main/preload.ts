@@ -15,6 +15,7 @@ const ALLOWED_INVOKE_CHANNELS = [
   'bookmark:deleteByUrl',
   'bookmark:update',
   'browsing:getContext',
+  'page:getContext',
   'tabs:save',
   'tabs:load',
   'tabs:clear',
