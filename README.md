@@ -17,8 +17,11 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - 📄 Page printing and source viewing
 - 🔎 Zoom controls (Ctrl +/-/0)
 - 🤖 Ollama/LLM integration with streaming inference
-- 💬 Chat sidebar for AI conversations
-- ⚡ Real-time model management (list, download, delete)
+- 💬 Chat sidebar for AI conversations with model capability detection
+- ⚡ Comprehensive model manager with download progress tracking
+- 🎯 Vision-capable and text-only model support
+- 🚀 Automatic GPU acceleration (CUDA, ROCm, Metal)
+- ⭐ Default model selection and persistent settings
 
 ### Planned Features
 - 🖼️ Vision model integration for screenshot analysis
@@ -115,13 +118,18 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 - [x] CI/CD with GitHub Actions
 - [x] Ollama service integration with auto-start capability
 - [x] Chat interface with streaming message support
-- [x] Model management (list, pull, delete via API)
+- [x] Comprehensive model manager UI with tabs
+- [x] Model registry with 12+ pre-configured models
+- [x] Vision vs text-only model capability tracking
+- [x] Download progress tracking with real-time updates
+- [x] Default model selection with persistent storage
+- [x] Model metadata display (size, parameters, capabilities)
+- [x] GPU acceleration support (automatic detection)
 - [x] IPC handlers for secure LLM operations
 - [x] Chat and Model state management with Zustand
 
 ### In Progress / Planned
-- [ ] Model management UI with download progress tracking
-- [ ] Vision model integration for screenshot analysis
+- [ ] Vision model integration for screenshot and page analysis
 - [ ] Content capture service for page context extraction
 - [ ] AI-powered page summarization with readability
 - [ ] Smart bookmarking with AI categorization
@@ -138,6 +146,7 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 | `Ctrl/Cmd + R` or `F5` | Reload page |
 | `Ctrl/Cmd + H` | Toggle history sidebar |
 | `Ctrl/Cmd + B` | Toggle bookmarks sidebar |
+| `Ctrl/Cmd + M` | Open model manager |
 | `Alt + Left` | Go back |
 | `Alt + Right` | Go forward |
 | `Ctrl/Cmd + Plus` | Zoom in |

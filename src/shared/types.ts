@@ -40,6 +40,45 @@ export interface OllamaModel {
   size: number;
   digest: string;
   modified_at: string;
+  details?: {
+    format?: string;
+    family?: string;
+    parameter_size?: string;
+    quantization_level?: string;
+  };
+}
+
+export interface ModelCapabilities {
+  vision: boolean;
+  chat: boolean;
+  completion: boolean;
+  embedding?: boolean;
+}
+
+export interface ModelMetadata {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  size?: string;
+  parameters?: string;
+  quantization?: string;
+  capabilities: ModelCapabilities;
+  recommended?: boolean;
+  requiresGPU?: boolean;
+  minRAM?: string;
+  tags?: string[];
+  family?: string;
+  homepage?: string;
+}
+
+export interface ModelRegistry {
+  models: ModelMetadata[];
+}
+
+export interface InstalledModelInfo extends OllamaModel {
+  metadata?: ModelMetadata;
+  isDefault?: boolean;
 }
 
 export interface PullProgress {

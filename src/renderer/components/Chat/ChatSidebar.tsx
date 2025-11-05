@@ -15,10 +15,21 @@ export const ChatSidebar: React.FC = () => {
     setError,
     startNewMessage,
   } = useChatStore();
-  const { models, isOllamaRunning, setModels, setIsOllamaRunning } = useModelStore();
+  const {
+    models,
+    defaultModel,
+    isOllamaRunning,
+    refreshModels,
+    setIsOllamaRunning,
+    setIsModelManagerOpen,
+  } = useModelStore();
   const { isChatOpen, toggleChat } = useBrowserStore();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get current model metadata
+  const currentModelInfo = models.find((m) => m.name === currentModel);
+  const supportsVision = currentModelInfo?.metadata?.capabilities.vision ?? false;
 
   // Load models on mount
   useEffect(() => {
@@ -28,12 +39,15 @@ export const ChatSidebar: React.FC = () => {
         setIsOllamaRunning(running);
 
         if (running) {
-          const modelList = await window.electron.invoke('ollama:listModels');
-          setModels(modelList);
+          await refreshModels();
 
-          // Set default model if none selected
-          if (!currentModel && modelList.length > 0) {
-            setCurrentModel(modelList[0].name);
+          // Set default or first model if none selected
+          if (!currentModel) {
+            if (defaultModel) {
+              setCurrentModel(defaultModel);
+            } else if (models.length > 0) {
+              setCurrentModel(models[0].name);
+            }
           }
         }
       } catch (error) {
@@ -148,28 +162,70 @@ export const ChatSidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* Model Selector */}
-      <div className="p-3 border-b border-border">
+      {/* Model Selector and Management */}
+      <div className="p-3 border-b border-border space-y-2">
         {!isOllamaRunning ? (
           <div className="text-sm text-muted-foreground text-center py-2">
             Ollama is not running. Please start Ollama to use the AI assistant.
           </div>
         ) : models.length === 0 ? (
-          <div className="text-sm text-muted-foreground text-center py-2">
-            No models installed. Please pull a model first.
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground text-center py-2">
+              No models installed. Download models to get started.
+            </div>
+            <button
+              onClick={() => setIsModelManagerOpen(true)}
+              className="w-full px-3 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Open Model Manager
+            </button>
           </div>
         ) : (
-          <select
-            className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
-            value={currentModel || ''}
-            onChange={(e) => setCurrentModel(e.target.value)}
-          >
-            {models.map((model) => (
-              <option key={model.name} value={model.name}>
-                {model.name}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
+              value={currentModel || ''}
+              onChange={(e) => setCurrentModel(e.target.value)}
+            >
+              {models.map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.metadata?.displayName || model.name}
+                  {model.name === defaultModel ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            {currentModelInfo && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex gap-1">
+                  {supportsVision ? (
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">Vision</span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-secondary rounded">Text-Only</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsModelManagerOpen(true)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="Manage models"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

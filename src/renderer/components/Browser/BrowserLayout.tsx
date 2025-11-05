@@ -5,14 +5,17 @@ import { TabBar } from './TabBar';
 import { ChatSidebar } from '../Chat/ChatSidebar';
 import { HistorySidebar } from './HistorySidebar';
 import { BookmarksSidebar } from './BookmarksSidebar';
+import { ModelManager } from '../Models/ModelManager';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
+import { useModelStore } from '../../store/models';
 
 export const BrowserLayout: React.FC = () => {
   const webviewRef = useRef<WebViewHandle>(null);
   const { toggleHistory, toggleBookmarks } = useBrowserStore();
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, loadTabs, suspendInactiveTabs } =
     useTabsStore();
+  const { setIsModelManagerOpen } = useModelStore();
 
   // Load tabs on mount
   useEffect(() => {
@@ -81,6 +84,12 @@ export const BrowserLayout: React.FC = () => {
         toggleBookmarks();
         return;
       }
+      // Ctrl/Cmd + M - Open Model Manager
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault();
+        setIsModelManagerOpen(true);
+        return;
+      }
 
       if (isTyping) {
         return;
@@ -139,7 +148,16 @@ export const BrowserLayout: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tabs, activeTabId, addTab, closeTab, setActiveTab, toggleHistory, toggleBookmarks]);
+  }, [
+    tabs,
+    activeTabId,
+    addTab,
+    closeTab,
+    setActiveTab,
+    toggleHistory,
+    toggleBookmarks,
+    setIsModelManagerOpen,
+  ]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
@@ -159,6 +177,9 @@ export const BrowserLayout: React.FC = () => {
         <HistorySidebar />
         <BookmarksSidebar />
       </div>
+
+      {/* Modal Overlays */}
+      <ModelManager />
     </div>
   );
 };

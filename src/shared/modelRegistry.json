@@ -1,0 +1,228 @@
+{
+  "models": [
+    {
+      "id": "llama3.2-vision:11b",
+      "name": "llama3.2-vision:11b",
+      "displayName": "Llama 3.2 Vision 11B",
+      "description": "Meta's multimodal model with vision and language understanding. Great for analyzing web pages and images.",
+      "size": "7.9 GB",
+      "parameters": "11B",
+      "quantization": "Q4_0",
+      "capabilities": {
+        "vision": true,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "16 GB",
+      "tags": ["vision", "multimodal", "recommended"],
+      "family": "llama",
+      "homepage": "https://ollama.com/library/llama3.2-vision"
+    },
+    {
+      "id": "llava:13b",
+      "name": "llava:13b",
+      "displayName": "LLaVA 13B",
+      "description": "Large Language and Vision Assistant. Excellent for detailed image analysis and visual question answering.",
+      "size": "8.0 GB",
+      "parameters": "13B",
+      "capabilities": {
+        "vision": true,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "16 GB",
+      "tags": ["vision", "multimodal", "detailed"],
+      "family": "llava",
+      "homepage": "https://ollama.com/library/llava"
+    },
+    {
+      "id": "llava:7b",
+      "name": "llava:7b",
+      "displayName": "LLaVA 7B",
+      "description": "Balanced vision model with good performance on consumer hardware. Great starting point for vision tasks.",
+      "size": "4.7 GB",
+      "parameters": "7B",
+      "capabilities": {
+        "vision": true,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "8 GB",
+      "tags": ["vision", "multimodal", "balanced"],
+      "family": "llava",
+      "homepage": "https://ollama.com/library/llava"
+    },
+    {
+      "id": "bakllava:latest",
+      "name": "bakllava:latest",
+      "displayName": "BakLLaVA",
+      "description": "Fine-tuned LLaVA model with improved performance on visual reasoning tasks.",
+      "size": "4.7 GB",
+      "parameters": "7B",
+      "capabilities": {
+        "vision": true,
+        "chat": true,
+        "completion": true
+      },
+      "requiresGPU": false,
+      "minRAM": "8 GB",
+      "tags": ["vision", "multimodal"],
+      "family": "llava",
+      "homepage": "https://ollama.com/library/bakllava"
+    },
+    {
+      "id": "moondream:latest",
+      "name": "moondream:latest",
+      "displayName": "Moondream 2B",
+      "description": "Ultra-lightweight vision model. Fast inference, perfect for quick page analysis on any hardware.",
+      "size": "1.7 GB",
+      "parameters": "2B",
+      "capabilities": {
+        "vision": true,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "4 GB",
+      "tags": ["vision", "multimodal", "lightweight", "fast"],
+      "family": "moondream",
+      "homepage": "https://ollama.com/library/moondream"
+    },
+    {
+      "id": "llama3.2:3b",
+      "name": "llama3.2:3b",
+      "displayName": "Llama 3.2 3B",
+      "description": "Meta's efficient text-only model. Great for general conversation and text analysis without image support.",
+      "size": "2.0 GB",
+      "parameters": "3B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "4 GB",
+      "tags": ["text-only", "lightweight", "recommended"],
+      "family": "llama",
+      "homepage": "https://ollama.com/library/llama3.2"
+    },
+    {
+      "id": "llama3.2:1b",
+      "name": "llama3.2:1b",
+      "displayName": "Llama 3.2 1B",
+      "description": "Ultra-lightweight text model. Fastest option for basic text tasks on limited hardware.",
+      "size": "1.3 GB",
+      "parameters": "1B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "requiresGPU": false,
+      "minRAM": "2 GB",
+      "tags": ["text-only", "ultra-lightweight", "fast"],
+      "family": "llama",
+      "homepage": "https://ollama.com/library/llama3.2"
+    },
+    {
+      "id": "llama3.1:8b",
+      "name": "llama3.1:8b",
+      "displayName": "Llama 3.1 8B",
+      "description": "Powerful text-only model with extended context. Excellent for detailed text analysis and conversation.",
+      "size": "4.7 GB",
+      "parameters": "8B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "8 GB",
+      "tags": ["text-only", "powerful", "recommended"],
+      "family": "llama",
+      "homepage": "https://ollama.com/library/llama3.1"
+    },
+    {
+      "id": "qwen2.5:7b",
+      "name": "qwen2.5:7b",
+      "displayName": "Qwen 2.5 7B",
+      "description": "Advanced text model with strong coding and reasoning capabilities. Great for technical tasks.",
+      "size": "4.7 GB",
+      "parameters": "7B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "requiresGPU": false,
+      "minRAM": "8 GB",
+      "tags": ["text-only", "coding", "reasoning"],
+      "family": "qwen",
+      "homepage": "https://ollama.com/library/qwen2.5"
+    },
+    {
+      "id": "mistral:7b",
+      "name": "mistral:7b",
+      "displayName": "Mistral 7B",
+      "description": "High-performance text model with excellent instruction following. Great for diverse tasks.",
+      "size": "4.1 GB",
+      "parameters": "7B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "recommended": true,
+      "requiresGPU": false,
+      "minRAM": "8 GB",
+      "tags": ["text-only", "high-performance", "recommended"],
+      "family": "mistral",
+      "homepage": "https://ollama.com/library/mistral"
+    },
+    {
+      "id": "phi3:mini",
+      "name": "phi3:mini",
+      "displayName": "Phi-3 Mini",
+      "description": "Microsoft's compact yet capable text model. Excellent quality-to-size ratio for general tasks.",
+      "size": "2.3 GB",
+      "parameters": "3.8B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "requiresGPU": false,
+      "minRAM": "4 GB",
+      "tags": ["text-only", "compact", "efficient"],
+      "family": "phi",
+      "homepage": "https://ollama.com/library/phi3"
+    },
+    {
+      "id": "gemma2:9b",
+      "name": "gemma2:9b",
+      "displayName": "Gemma 2 9B",
+      "description": "Google's open model with strong reasoning. Great for analysis and conversation.",
+      "size": "5.5 GB",
+      "parameters": "9B",
+      "capabilities": {
+        "vision": false,
+        "chat": true,
+        "completion": true
+      },
+      "requiresGPU": false,
+      "minRAM": "10 GB",
+      "tags": ["text-only", "reasoning"],
+      "family": "gemma",
+      "homepage": "https://ollama.com/library/gemma2"
+    }
+  ]
+}
