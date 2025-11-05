@@ -53,9 +53,7 @@ export const TabBar: React.FC = () => {
             {/* Close button */}
             <button
               onClick={(e) => handleCloseTab(tab.id, e)}
-              className={`p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors ${
-                tabs.length === 1 ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'
-              }`}
+              className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
               title="Close tab"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -16,13 +16,19 @@ interface TabsState {
   unsuspendTab: (tabId: string) => void;
 }
 
+// Counter to ensure unique tab IDs even when created simultaneously
+let tabCounter = 0;
+
 export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
 
   addTab: (url = '') => {
+    // Generate a unique ID combining UUID, timestamp, and counter
+    const uniqueId = `${crypto.randomUUID()}-${Date.now()}-${++tabCounter}`;
+
     const newTab: Tab = {
-      id: crypto.randomUUID(),
+      id: uniqueId,
       url,
       title: url || 'New Tab',
       favicon: '',

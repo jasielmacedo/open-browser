@@ -43,7 +43,7 @@ export const BrowserLayout: React.FC = () => {
       // Ctrl/Cmd + W - Close Tab
       if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
         e.preventDefault();
-        if (activeTabId && tabs.length > 1) {
+        if (activeTabId) {
           closeTab(activeTabId);
         }
         return;
