@@ -1,29 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore, Message } from '../../store/chat';
 import { useBrowserStore } from '../../store/browser';
+import { useModelStore } from '../../store/models';
 
 export const ChatSidebar: React.FC = () => {
-  const { messages, isStreaming, currentModel, addMessage } = useChatStore();
+  const {
+    messages,
+    isStreaming,
+    currentModel,
+    addMessage,
+    appendToLastMessage,
+    setIsStreaming,
+    setCurrentModel,
+    setError,
+    startNewMessage,
+  } = useChatStore();
+  const {
+    models,
+    defaultModel,
+    isOllamaRunning,
+    refreshModels,
+    setIsOllamaRunning,
+    setIsModelManagerOpen,
+  } = useModelStore();
   const { isChatOpen, toggleChat } = useBrowserStore();
   const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
+  // Get current model metadata
+  const currentModelInfo = models.find((m) => m.name === currentModel);
+  const supportsVision = currentModelInfo?.metadata?.capabilities.vision ?? false;
 
-    addMessage({
-      role: 'user',
-      content: input.trim(),
-    });
+  // Load models on mount
+  useEffect(() => {
+    const checkOllama = async () => {
+      try {
+        const running = await window.electron.invoke('ollama:isRunning');
+        setIsOllamaRunning(running);
 
+        if (running) {
+          await refreshModels();
+
+          // Set default or first model if none selected
+          if (!currentModel) {
+            if (defaultModel) {
+              setCurrentModel(defaultModel);
+            } else if (models.length > 0) {
+              setCurrentModel(models[0].name);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check Ollama:', error);
+        setIsOllamaRunning(false);
+      }
+    };
+
+    if (isChatOpen) {
+      checkOllama();
+    }
+    // Only run when chat opens - intentionally not including other deps to avoid re-fetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChatOpen]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming || !currentModel) return;
+
+    const userMessage = input.trim();
     setInput('');
 
-    // TODO: Implement actual LLM call
-    setTimeout(() => {
-      addMessage({
-        role: 'assistant',
-        content: 'LLM integration coming soon! This is a placeholder response.',
+    // Add user message
+    addMessage({
+      role: 'user',
+      content: userMessage,
+    });
+
+    // Start assistant message
+    setIsStreaming(true);
+    setError(null);
+    startNewMessage('assistant');
+
+    try {
+      // Set up streaming listener
+      const unsubscribe = window.electron.on('ollama:chatToken', (token: string) => {
+        appendToLastMessage(token);
       });
-    }, 500);
+
+      // Convert messages to Ollama format
+      const chatMessages = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // Add the new user message
+      chatMessages.push({
+        role: 'user' as const,
+        content: userMessage,
+      });
+
+      // Send chat request
+      await window.electron.invoke('ollama:chat', {
+        model: currentModel,
+        messages: chatMessages,
+      });
+
+      // Cleanup listener
+      unsubscribe();
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      setError(error.message || 'Failed to get response from AI');
+    } finally {
+      setIsStreaming(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -71,21 +164,71 @@ export const ChatSidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* Model Selector */}
-      <div className="p-3 border-b border-border">
-        <select
-          className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
-          value={currentModel || ''}
-          onChange={(e) => {
-            // TODO: Implement model selection
-            console.log('Select model:', e.target.value);
-          }}
-        >
-          <option value="">Select a model...</option>
-          <option value="llava">LLaVA 7B (Not installed)</option>
-          <option value="bakllava">BakLLaVA 7B (Not installed)</option>
-          <option value="moondream">Moondream 2B (Not installed)</option>
-        </select>
+      {/* Model Selector and Management */}
+      <div className="p-3 border-b border-border space-y-2">
+        {!isOllamaRunning ? (
+          <div className="text-sm text-muted-foreground text-center py-2">
+            Ollama is not running. Please start Ollama to use the AI assistant.
+          </div>
+        ) : models.length === 0 ? (
+          <div className="space-y-2">
+            <div className="text-sm text-muted-foreground text-center py-2">
+              No models installed. Download models to get started.
+            </div>
+            <button
+              onClick={() => setIsModelManagerOpen(true)}
+              className="w-full px-3 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              Open Model Manager
+            </button>
+          </div>
+        ) : (
+          <>
+            <select
+              className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
+              value={currentModel || ''}
+              onChange={(e) => setCurrentModel(e.target.value)}
+            >
+              {models.map((model) => (
+                <option key={model.name} value={model.name}>
+                  {model.metadata?.displayName || model.name}
+                  {model.name === defaultModel ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+            {currentModelInfo && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex gap-1">
+                  {supportsVision ? (
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">Vision</span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-secondary rounded">Text-Only</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsModelManagerOpen(true)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="Manage models"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Messages */}
@@ -136,6 +279,7 @@ export const ChatSidebar: React.FC = () => {
             <span>AI is thinking...</span>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -152,7 +296,7 @@ export const ChatSidebar: React.FC = () => {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={!input.trim() || isStreaming || !currentModel || !isOllamaRunning}
             className="px-3 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >

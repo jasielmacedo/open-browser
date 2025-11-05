@@ -21,9 +21,21 @@ const ALLOWED_INVOKE_CHANNELS = [
   'webview:openDevTools',
   'webview:print',
   'webview:viewSource',
+  'ollama:isRunning',
+  'ollama:start',
+  'ollama:listModels',
+  'ollama:pullModel',
+  'ollama:deleteModel',
+  'ollama:generate',
+  'ollama:chat',
 ];
 
-const ALLOWED_LISTEN_CHANNELS = ['open-view-source'];
+const ALLOWED_LISTEN_CHANNELS = [
+  'open-view-source',
+  'ollama:pullProgress',
+  'ollama:generateToken',
+  'ollama:chatToken',
+];
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object

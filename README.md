@@ -16,13 +16,19 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - 🛠️ Developer tools integration (F12)
 - 📄 Page printing and source viewing
 - 🔎 Zoom controls (Ctrl +/-/0)
+- 🤖 Ollama/LLM integration with streaming inference
+- 💬 Chat sidebar for AI conversations with model capability detection
+- ⚡ Comprehensive model manager with download progress tracking
+- 🎯 Vision-capable and text-only model support
+- 🚀 Automatic GPU acceleration (CUDA, ROCm, Metal)
+- ⭐ Default model selection and persistent settings
 
 ### Planned Features
-- 🤖 Local multi-modal vision LLMs (no cloud dependency)
-- 💬 Chat interface for page analysis and interaction
-- 📥 Model management with downloads from Hugging Face
-- 🔒 Privacy-first AI inference (all processing happens locally)
-- ⚡ Powered by Ollama for efficient inference
+- 🖼️ Vision model integration for screenshot analysis
+- 📊 AI-powered page summarization and content extraction
+- 📥 Model management UI with progress tracking
+- 🏷️ Smart bookmarking with AI categorization
+- 🔍 Semantic search across browsing history
 
 ## Tech Stack
 
@@ -32,9 +38,10 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - **Tailwind CSS** - Utility-first styling
 - **Zustand** - Lightweight state management
 - **Better-SQLite3** - Local database for history and bookmarks
+- **Axios** - HTTP client for Ollama API communication
 - **ESLint + Prettier** - Code quality and formatting
 - **Husky** - Git hooks for pre-commit checks
-- **Ollama** - Local LLM inference engine (planned integration)
+- **Ollama** - Local LLM inference engine
 
 ## Development
 
@@ -42,13 +49,19 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 
 - Node.js 18+ (LTS recommended)
 - npm or pnpm
-- Ollama installed ([ollama.com](https://ollama.com))
+- Ollama installed ([ollama.com](https://ollama.com)) - Required for AI features
 
 ### Getting Started
 
 ```bash
 # Install dependencies
 npm install
+
+# Start Ollama (required for AI features)
+ollama serve
+
+# Pull a model (optional, for testing AI features)
+ollama pull llama2
 
 # Start development server
 npm run dev
@@ -67,11 +80,11 @@ open-browser/
 ├── src/
 │   ├── main/              # Electron main process
 │   │   ├── ipc/          # IPC handlers for renderer communication
-│   │   ├── services/     # Database and backend services
+│   │   ├── services/     # Backend services (database, ollama)
 │   │   └── utils/        # Validation and utilities
 │   ├── renderer/          # React UI
 │   │   ├── components/   # React components (Browser, Chat, etc.)
-│   │   ├── store/        # Zustand state management
+│   │   ├── store/        # Zustand state management (browser, chat, models)
 │   │   └── services/     # Frontend services
 │   └── shared/           # Shared types and utilities
 ├── .github/              # GitHub configuration and workflows
@@ -103,14 +116,24 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 - [x] Context menus and keyboard shortcuts
 - [x] Code quality tooling (ESLint, Prettier, Husky)
 - [x] CI/CD with GitHub Actions
+- [x] Ollama service integration with auto-start capability
+- [x] Chat interface with streaming message support
+- [x] Comprehensive model manager UI with tabs
+- [x] Model registry with 12+ pre-configured models
+- [x] Vision vs text-only model capability tracking
+- [x] Download progress tracking with real-time updates
+- [x] Default model selection with persistent storage
+- [x] Model metadata display (size, parameters, capabilities)
+- [x] GPU acceleration support (automatic detection)
+- [x] IPC handlers for secure LLM operations
+- [x] Chat and Model state management with Zustand
 
 ### In Progress / Planned
-- [ ] Ollama integration for local LLM inference
-- [ ] Chat interface for page interaction
-- [ ] Model management system
-- [ ] Vision model integration for screenshot analysis
-- [ ] AI-powered page summarization
+- [ ] Vision model integration for screenshot and page analysis
+- [ ] Content capture service for page context extraction
+- [ ] AI-powered page summarization with readability
 - [ ] Smart bookmarking with AI categorization
+- [ ] Model registry with pre-configured models
 
 ## Keyboard Shortcuts
 
@@ -123,6 +146,7 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 | `Ctrl/Cmd + R` or `F5` | Reload page |
 | `Ctrl/Cmd + H` | Toggle history sidebar |
 | `Ctrl/Cmd + B` | Toggle bookmarks sidebar |
+| `Ctrl/Cmd + M` | Open model manager |
 | `Alt + Left` | Go back |
 | `Alt + Right` | Go forward |
 | `Ctrl/Cmd + Plus` | Zoom in |
