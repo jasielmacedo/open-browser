@@ -40,9 +40,7 @@ export const ModelManager: React.FC = () => {
             <div>
               <h2 className="text-xl font-semibold">Model Manager</h2>
               <p className="text-sm text-muted-foreground">
-                {isOllamaRunning
-                  ? 'Manage your local AI models'
-                  : 'Ollama is not running'}
+                {isOllamaRunning ? 'Manage your local AI models' : 'Ollama is not running'}
               </p>
             </div>
           </div>

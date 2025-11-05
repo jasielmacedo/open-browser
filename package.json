@@ -39,6 +39,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/jsdom": "^27.0.0",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
@@ -67,10 +68,13 @@
     "wait-on": "^9.0.1"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "axios": "^1.7.0",
     "better-sqlite3": "^12.4.1",
+    "jsdom": "^27.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "sharp": "^0.34.4",
     "zustand": "^5.0.8"
   },
   "optionalDependencies": {

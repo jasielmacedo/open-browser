@@ -19,7 +19,10 @@
       "Bash(npm run lint:*)",
       "Bash(curl:*)",
       "Bash(unzip:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(npm run format:*)",
+      "Bash(npx electron-rebuild:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

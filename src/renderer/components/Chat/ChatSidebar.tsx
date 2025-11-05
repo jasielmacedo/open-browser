@@ -2,18 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore, Message } from '../../store/chat';
 import { useBrowserStore } from '../../store/browser';
 import { useModelStore } from '../../store/models';
+import { supportsVision, supportsToolCalling } from '../../../shared/modelRegistry';
 
 export const ChatSidebar: React.FC = () => {
   const {
     messages,
     isStreaming,
     currentModel,
-    addMessage,
-    appendToLastMessage,
-    setIsStreaming,
+    error,
+    planningMode,
     setCurrentModel,
     setError,
-    startNewMessage,
+    setPlanningMode,
+    sendChatMessage,
+    clearMessages,
   } = useChatStore();
   const {
     models,
@@ -25,11 +27,16 @@ export const ChatSidebar: React.FC = () => {
   } = useModelStore();
   const { isChatOpen, toggleChat } = useBrowserStore();
   const [input, setInput] = useState('');
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [includeContext, setIncludeContext] = useState(false); // User toggle for page context
+  const [contextSent, setContextSent] = useState(false); // Track if context has been sent
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get current model metadata
   const currentModelInfo = models.find((m) => m.name === currentModel);
-  const supportsVision = currentModelInfo?.metadata?.capabilities.vision ?? false;
+  const hasVisionSupport = currentModel ? supportsVision(currentModel) : false;
+  const hasToolCallingSupport = currentModel ? supportsToolCalling(currentModel) : false;
 
   // Load models on mount
   useEffect(() => {
@@ -68,55 +75,59 @@ export const ChatSidebar: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Reset context sent flag when conversation is cleared
+  useEffect(() => {
+    if (messages.length === 0) {
+      setContextSent(false);
+    }
+  }, [messages]);
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming || !currentModel) return;
 
     const userMessage = input.trim();
+    const messageImages = [...attachedImages];
     setInput('');
-
-    // Add user message
-    addMessage({
-      role: 'user',
-      content: userMessage,
-    });
-
-    // Start assistant message
-    setIsStreaming(true);
-    setError(null);
-    startNewMessage('assistant');
+    setAttachedImages([]);
 
     try {
-      // Set up streaming listener
-      const unsubscribe = window.electron.on('ollama:chatToken', (token: string) => {
-        appendToLastMessage(token);
-      });
+      // Capture page context only if user enabled it AND context hasn't been sent yet
+      let pageCapture = undefined;
+      if (includeContext && !contextSent) {
+        pageCapture = await window.electron.invoke('capture:forText');
+        setContextSent(true); // Mark that we've sent context
+      }
 
-      // Convert messages to Ollama format
-      const chatMessages = messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      // Add the new user message
-      chatMessages.push({
-        role: 'user' as const,
-        content: userMessage,
-      });
-
-      // Send chat request
-      await window.electron.invoke('ollama:chat', {
-        model: currentModel,
-        messages: chatMessages,
-      });
-
-      // Cleanup listener
-      unsubscribe();
+      await sendChatMessage(
+        userMessage,
+        messageImages.length > 0 ? messageImages : undefined,
+        pageCapture
+      );
     } catch (error: any) {
       console.error('Chat error:', error);
       setError(error.message || 'Failed to get response from AI');
-    } finally {
-      setIsStreaming(false);
     }
+  };
+
+  const handleCaptureScreenshot = async () => {
+    if (!hasVisionSupport || isCapturing) return;
+
+    setIsCapturing(true);
+    try {
+      const screenshot = await window.electron.invoke('capture:screenshot');
+      if (screenshot) {
+        setAttachedImages((prev) => [...prev, screenshot]);
+      }
+    } catch (error) {
+      console.error('Failed to capture screenshot:', error);
+      alert('Failed to capture screenshot. Please try again.');
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -198,9 +209,32 @@ export const ChatSidebar: React.FC = () => {
             </select>
             {currentModelInfo && (
               <div className="flex items-center justify-between text-xs">
-                <div className="flex gap-1">
-                  {supportsVision ? (
-                    <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">Vision</span>
+                <div className="flex gap-1 items-center">
+                  {hasVisionSupport ? (
+                    <>
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary rounded flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        Vision
+                      </span>
+                    </>
                   ) : (
                     <span className="px-2 py-0.5 bg-secondary rounded">Text-Only</span>
                   )}
@@ -231,10 +265,49 @@ export const ChatSidebar: React.FC = () => {
         )}
       </div>
 
+      {/* Error Banner */}
+      {error && !isStreaming && (
+        <div className="mx-3 mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm">
+          <div className="flex items-start gap-2">
+            <svg
+              className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div className="flex-1">
+              <p className="font-medium text-destructive">Connection Error</p>
+              <p className="text-xs text-muted-foreground mt-1">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-3 px-4">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <svg
                 className="w-6 h-6 text-primary"
@@ -250,11 +323,28 @@ export const ChatSidebar: React.FC = () => {
                 />
               </svg>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-sm font-medium">Start a conversation</p>
               <p className="text-xs text-muted-foreground">
                 Ask questions about the current page or anything else
               </p>
+              {hasVisionSupport && (
+                <div className="mt-3 p-2 bg-primary/5 rounded border border-primary/20 text-xs text-muted-foreground">
+                  <p className="font-medium text-primary mb-1">Vision Model Active</p>
+                  <p>
+                    This model can analyze images! Try using the three-dot menu to ask about the
+                    current page with visual context.
+                  </p>
+                </div>
+              )}
+              {hasToolCallingSupport && (
+                <div className="mt-3 p-2 bg-accent rounded border border-border text-xs text-muted-foreground">
+                  <p className="font-medium text-primary mb-1">Tool Calling Supported</p>
+                  <p>
+                    Enable Planning Mode in the input area below to let the AI use tools for searching history, analyzing pages, and more.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -283,21 +373,126 @@ export const ChatSidebar: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-2">
+        {/* Image Attachments Preview */}
+        {attachedImages.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {attachedImages.map((image, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={`data:image/jpeg;base64,${image}`}
+                  alt={`Attachment ${index + 1}`}
+                  className="w-20 h-20 object-cover rounded border border-border"
+                />
+                <button
+                  onClick={() => handleRemoveImage(index)}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove image"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Input Area */}
         <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about this page..."
-            rows={2}
-            className="flex-1 px-3 py-2 bg-secondary border border-input rounded text-sm resize-none focus:outline-none focus:border-primary transition-colors"
-            disabled={isStreaming}
-          />
+          <div className="flex-1 space-y-1">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about this page..."
+              rows={2}
+              className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm resize-none focus:outline-none focus:border-primary transition-colors"
+              disabled={isStreaming}
+            />
+            {/* Tool controls - different UI based on model capabilities */}
+            <div className="flex items-center gap-4 text-xs flex-wrap">
+              {/* Page Context Toggle - always available */}
+              <label className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+                <button
+                  onClick={() => setIncludeContext(!includeContext)}
+                  className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                    includeContext ? 'bg-primary' : 'bg-muted'
+                  }`}
+                  disabled={isStreaming}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                      includeContext ? 'translate-x-3.5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                <span>Include Page Context</span>
+              </label>
+
+              {hasToolCallingSupport ? (
+                /* Planning Mode Toggle - AI decides when to use tools */
+                <>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+                    <button
+                      onClick={() => setPlanningMode(!planningMode)}
+                      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${
+                        planningMode ? 'bg-primary' : 'bg-muted'
+                      }`}
+                      disabled={isStreaming}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                          planningMode ? 'translate-x-3.5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                    <span>Planning Mode</span>
+                  </label>
+                  {planningMode && (
+                    <span className="text-[10px] text-muted-foreground/70">
+                      AI can use tools to search history, analyze pages, etc.
+                    </span>
+                  )}
+                </>
+              ) : (
+                /* Manual tool buttons - user triggers tools explicitly */
+                hasVisionSupport && (
+                  <button
+                    onClick={handleCaptureScreenshot}
+                    disabled={isCapturing || isStreaming}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 disabled:opacity-50"
+                    title="Capture current page screenshot"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    {isCapturing ? 'Capturing...' : 'Capture screenshot'}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
           <button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming || !currentModel || !isOllamaRunning}
-            className="px-3 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-start"
             title="Send message"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,6 +512,81 @@ export const ChatSidebar: React.FC = () => {
 
 const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
   const isUser = message.role === 'user';
+  const isTool = message.role === 'tool';
+  const isToolExecution = message.isToolExecution;
+
+  // Special styling for tool messages
+  if (isToolExecution || isTool) {
+    return (
+      <div className="flex justify-center my-2">
+        <div
+          className={`px-4 py-2 rounded-lg text-sm border ${
+            isToolExecution
+              ? 'bg-blue-500/10 border-blue-500/30 text-blue-200'
+              : 'bg-green-500/10 border-green-500/30 text-green-200'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            {isToolExecution ? (
+              <>
+                {/* Tool execution indicator */}
+                <svg
+                  className="w-4 h-4 mt-0.5 flex-shrink-0 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <div className="font-medium mb-1">Executing Tool: {message.toolCall?.name}</div>
+                  {message.toolCall?.arguments && Object.keys(message.toolCall.arguments).length > 0 && (
+                    <div className="text-xs opacity-75 mt-1">
+                      <code className="text-[10px]">{JSON.stringify(message.toolCall.arguments)}</code>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Tool result indicator */}
+                <svg
+                  className="w-4 h-4 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <div className="font-medium">Tool Result</div>
+                  <div className="text-xs opacity-75 mt-1 max-h-20 overflow-y-auto">
+                    <code className="text-[10px] whitespace-pre-wrap">{message.content}</code>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -325,13 +595,96 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
           isUser ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground'
         }`}
       >
+        {/* Context Info Badge */}
+        {isUser && message.contextInfo && (
+          <div className="mb-2 text-xs opacity-75 space-y-1">
+            {message.contextInfo.pageUrl && (
+              <div className="flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                  />
+                </svg>
+                <span className="truncate font-medium">
+                  {message.contextInfo.pageTitle || 'Page'}
+                </span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1">
+              {message.contextInfo.tokenEstimate && (
+                <span className="px-1.5 py-0.5 bg-primary-foreground/20 rounded text-[10px] font-medium">
+                  ~{message.contextInfo.tokenEstimate} tokens
+                </span>
+              )}
+              {message.contextInfo.hasScreenshot && (
+                <span className="px-1.5 py-0.5 bg-primary-foreground/10 rounded text-[10px]">
+                  Screenshot
+                </span>
+              )}
+              {message.contextInfo.hasContent && (
+                <span className="px-1.5 py-0.5 bg-primary-foreground/10 rounded text-[10px]">
+                  Page Content
+                </span>
+              )}
+              {message.contextInfo.hasHistory && (
+                <span className="px-1.5 py-0.5 bg-primary-foreground/10 rounded text-[10px]">
+                  History
+                </span>
+              )}
+              {message.contextInfo.hasBookmarks && (
+                <span className="px-1.5 py-0.5 bg-primary-foreground/10 rounded text-[10px]">
+                  Bookmarks
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Display attached images */}
+        {message.images && message.images.length > 0 && (
+          <div className="mb-2 space-y-2">
+            {message.images.map((image, index) => (
+              <div key={index} className="rounded overflow-hidden border border-border/50">
+                <img
+                  src={`data:image/jpeg;base64,${image}`}
+                  alt={`Attachment ${index + 1}`}
+                  className="w-full max-w-xs object-contain"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Message content */}
         <p className="whitespace-pre-wrap break-words">{message.content}</p>
-        <p className="text-xs opacity-70 mt-1">
-          {message.timestamp.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
+
+        {/* Timestamp and Timing Info */}
+        <div className="flex items-center gap-2 text-xs opacity-70 mt-1 flex-wrap">
+          <span>
+            {message.timestamp.toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {/* Show timing for assistant messages */}
+          {!isUser && message.timing && (
+            <>
+              {message.timing.ttft !== undefined && (
+                <span className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px] font-medium">
+                  TTFT: {(message.timing.ttft / 1000).toFixed(2)}s
+                </span>
+              )}
+              {message.timing.totalTime !== undefined && (
+                <span className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px] font-medium">
+                  Total: {(message.timing.totalTime / 1000).toFixed(2)}s
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

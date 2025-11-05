@@ -22,6 +22,10 @@ const ALLOWED_INVOKE_CHANNELS = [
   'webview:openDevTools',
   'webview:print',
   'webview:viewSource',
+  'capture:page',
+  'capture:screenshot',
+  'capture:forVision',
+  'capture:forText',
   'ollama:isRunning',
   'ollama:start',
   'ollama:listModels',
@@ -29,6 +33,11 @@ const ALLOWED_INVOKE_CHANNELS = [
   'ollama:deleteModel',
   'ollama:generate',
   'ollama:chat',
+  'tool:search_history',
+  'tool:get_bookmarks',
+  'tool:analyze_page_content',
+  'tool:capture_screenshot',
+  'tool:get_page_metadata',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -36,6 +45,7 @@ const ALLOWED_LISTEN_CHANNELS = [
   'ollama:pullProgress',
   'ollama:generateToken',
   'ollama:chatToken',
+  'ollama:toolCalls',
 ];
 
 // Expose protected methods that allow the renderer process to use

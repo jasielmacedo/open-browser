@@ -16,11 +16,64 @@ console.log('===== SETUP COMPLETED =====');
 
 let mainWindow: BrowserWindow | null = null;
 
+// Window state persistence
+interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+  isMaximized: boolean;
+}
+
+let windowState: WindowState = {
+  width: 1200,
+  height: 800,
+  isMaximized: false,
+};
+
+// Load window state from database
+const loadWindowState = (): WindowState => {
+  try {
+    const stateJson = databaseService.getSetting('window-state');
+    if (stateJson) {
+      return JSON.parse(stateJson);
+    }
+  } catch (error) {
+    console.error('Failed to load window state:', error);
+  }
+  return windowState;
+};
+
+// Save window state to database
+const saveWindowState = () => {
+  try {
+    if (!mainWindow) return;
+
+    const bounds = mainWindow.getBounds();
+    windowState = {
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      isMaximized: mainWindow.isMaximized(),
+    };
+
+    databaseService.setSetting('window-state', JSON.stringify(windowState));
+  } catch (error) {
+    console.error('Failed to save window state:', error);
+  }
+};
+
 const createWindow = () => {
+  // Load previous window state
+  windowState = loadWindowState();
+
   // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: windowState.width,
+    height: windowState.height,
+    x: windowState.x,
+    y: windowState.y,
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
@@ -67,7 +120,32 @@ const createWindow = () => {
 
   // Show window when ready to prevent flicker
   mainWindow.once('ready-to-show', () => {
+    // Restore maximized state
+    if (windowState.isMaximized) {
+      mainWindow?.maximize();
+    }
     mainWindow?.show();
+  });
+
+  // Save window state on resize/move
+  mainWindow.on('resize', () => {
+    if (!mainWindow?.isMaximized()) {
+      saveWindowState();
+    }
+  });
+
+  mainWindow.on('move', () => {
+    if (!mainWindow?.isMaximized()) {
+      saveWindowState();
+    }
+  });
+
+  mainWindow.on('maximize', saveWindowState);
+  mainWindow.on('unmaximize', saveWindowState);
+
+  // Save state before closing
+  mainWindow.on('close', () => {
+    saveWindowState();
   });
 
   // Emitted when the window is closed
@@ -80,6 +158,9 @@ const createWindow = () => {
 app.whenReady().then(async () => {
   // Initialize database
   databaseService.initialize();
+
+  // Set flag to indicate app is running - used for crash detection
+  databaseService.setSetting('app-running', 'true');
 
   // Register IPC handlers
   console.log('Registering IPC handlers...');
@@ -167,6 +248,10 @@ app.on('window-all-closed', () => {
 
 // Cleanup on app quit
 app.on('before-quit', () => {
+  // Clear tabs on clean exit (not on crash)
+  databaseService.clearTabs();
+  // Mark app as cleanly closed
+  databaseService.setSetting('app-running', 'false');
   databaseService.close();
   ollamaService.stop();
 });

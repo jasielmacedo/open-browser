@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow, webContents } from 'electron';
 import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
 import {
   validateUrl,
@@ -7,6 +7,7 @@ import {
   validateBoolean,
 } from '../utils/validation';
 import { ollamaService } from '../services/ollama';
+import { captureService } from '../services/capture';
 import type { GenerateOptions, ChatOptions } from '../../shared/types';
 
 export function registerIpcHandlers() {
@@ -265,6 +266,12 @@ export function registerIpcHandlers() {
     return databaseService.clearTabs();
   });
 
+  ipcMain.handle('tabs:wasCrash', async () => {
+    // If app-running is "true", it means the app crashed (didn't cleanly exit)
+    const wasRunning = databaseService.getSetting('app-running');
+    return wasRunning === 'true';
+  });
+
   // Webview control handlers
   ipcMain.handle('webview:openDevTools', async (_event) => {
     // The webview will handle this via executeJavaScript
@@ -284,6 +291,93 @@ export function registerIpcHandlers() {
       return `view-source:${url}`;
     } catch (error: any) {
       console.error('webview:viewSource validation error:', error.message);
+      throw error;
+    }
+  });
+
+  // Page capture handlers
+  ipcMain.handle('capture:page', async (event, options?: any) => {
+    try {
+      const webContents = event.sender;
+
+      // Get the focused webview's webContents instead of the main window
+      const focusedWebContents = webContents.isFocused()
+        ? webContents
+        : BrowserWindow.getFocusedWindow()?.webContents;
+
+      if (!focusedWebContents) {
+        throw new Error('No active page to capture');
+      }
+
+      const captureOptions = {
+        includeScreenshot: options?.includeScreenshot ?? true,
+        extractReadable: options?.extractReadable ?? true,
+        maxWidth: options?.maxWidth ?? 1280,
+        maxHeight: options?.maxHeight ?? 720,
+        quality: options?.quality ?? 80,
+      };
+
+      return await captureService.capturePage(focusedWebContents, captureOptions);
+    } catch (error: any) {
+      console.error('capture:page error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('capture:screenshot', async (event, options?: any) => {
+    try {
+      // Find the active webview (browser tab) instead of the chat window
+      const allWebContents = webContents.getAllWebContents();
+      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+
+      if (!webviewContents) {
+        throw new Error('No active browser tab to capture screenshot');
+      }
+
+      const captureOptions = {
+        maxWidth: options?.maxWidth ?? 1280,
+        maxHeight: options?.maxHeight ?? 720,
+        quality: options?.quality ?? 80,
+      };
+
+      return await captureService.captureScreenshotOnly(webviewContents, captureOptions);
+    } catch (error: any) {
+      console.error('capture:screenshot error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('capture:forVision', async (event) => {
+    try {
+      // Find the active webview (browser tab) instead of the chat window
+      const allWebContents = webContents.getAllWebContents();
+      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+
+      if (!webviewContents) {
+        throw new Error('No active browser tab for vision capture');
+      }
+
+      return await captureService.captureForVision(webviewContents);
+    } catch (error: any) {
+      console.error('capture:forVision error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('capture:forText', async (event) => {
+    try {
+      // Find the active webview (browser tab) instead of the chat window
+      // Webviews have type 'webview' and are guest windows
+      const allWebContents = webContents.getAllWebContents();
+      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+
+      if (!webviewContents) {
+        throw new Error('No active browser tab for text capture');
+      }
+
+      return await captureService.captureForText(webviewContents);
+    } catch (error: any) {
+      console.error('capture:forText error:', error.message);
       throw error;
     }
   });
@@ -390,7 +484,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('ollama:chat', async (event, options: ChatOptions) => {
+  ipcMain.handle('ollama:chat', async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[] }) => {
     try {
       if (!options || typeof options !== 'object') {
         throw new Error('Invalid chat options');
@@ -408,7 +502,7 @@ export function registerIpcHandlers() {
           throw new Error('Invalid message object');
         }
         validateString(msg.content, 'Message content', 50000);
-        if (!['system', 'user', 'assistant'].includes(msg.role)) {
+        if (!['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
           throw new Error('Invalid message role');
         }
       }
@@ -429,15 +523,135 @@ export function registerIpcHandlers() {
         messages: options.messages,
         context: options.context,
         stream: true,
+        planningMode: options.planningMode,
+        tools: options.tools,
       });
 
       for await (const token of generator) {
-        event.sender.send('ollama:chatToken', token);
+        // Handle both string tokens and tool call objects
+        if (typeof token === 'string') {
+          event.sender.send('ollama:chatToken', token);
+        } else if (token.type === 'tool_calls') {
+          // Send tool calls to renderer for display
+          event.sender.send('ollama:toolCalls', token.tool_calls);
+        }
       }
 
       return { success: true };
     } catch (error: any) {
       console.error('ollama:chat error:', error.message);
+      throw error;
+    }
+  });
+
+  // Tool execution handlers
+  ipcMain.handle('tool:search_history', async (event, args: any) => {
+    try {
+      const { query = '', limit = 10 } = args || {};
+      const history = await databaseService.searchHistory(query, limit);
+      return history.map((h) => ({
+        title: h.title,
+        url: h.url,
+        visitTime: h.visitTime,
+      }));
+    } catch (error: any) {
+      console.error('tool:search_history error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tool:get_bookmarks', async (event, args: any) => {
+    try {
+      const { query = '' } = args || {};
+      const bookmarks = await databaseService.getBookmarks();
+      // Filter by query if provided
+      if (query) {
+        const lowerQuery = query.toLowerCase();
+        return bookmarks.filter(
+          (b) =>
+            b.title.toLowerCase().includes(lowerQuery) || b.url.toLowerCase().includes(lowerQuery)
+        );
+      }
+      return bookmarks.map((b) => ({
+        title: b.title,
+        url: b.url,
+        tags: b.tags,
+      }));
+    } catch (error: any) {
+      console.error('tool:get_bookmarks error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tool:analyze_page_content', async (event) => {
+    try {
+      const webContents = event.sender;
+      const focusedWebContents = webContents.isFocused()
+        ? webContents
+        : BrowserWindow.getFocusedWindow()?.webContents;
+
+      if (!focusedWebContents) {
+        throw new Error('No active page to analyze');
+      }
+
+      const capture = await captureService.capturePage(focusedWebContents, {
+        includeScreenshot: false,
+        extractReadable: true,
+      });
+
+      return {
+        url: capture.url,
+        title: capture.title,
+        content: capture.readable?.textContent || '',
+        excerpt: capture.readable?.excerpt || '',
+      };
+    } catch (error: any) {
+      console.error('tool:analyze_page_content error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tool:capture_screenshot', async (event) => {
+    try {
+      const webContents = event.sender;
+      const focusedWebContents = webContents.isFocused()
+        ? webContents
+        : BrowserWindow.getFocusedWindow()?.webContents;
+
+      if (!focusedWebContents) {
+        throw new Error('No active page to capture');
+      }
+
+      const screenshot = await captureService.captureScreenshot(focusedWebContents);
+      return { screenshot };
+    } catch (error: any) {
+      console.error('tool:capture_screenshot error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tool:get_page_metadata', async (event) => {
+    try {
+      const webContents = event.sender;
+      const focusedWebContents = webContents.isFocused()
+        ? webContents
+        : BrowserWindow.getFocusedWindow()?.webContents;
+
+      if (!focusedWebContents) {
+        throw new Error('No active page');
+      }
+
+      const url = focusedWebContents.getURL();
+      const title = focusedWebContents.getTitle();
+
+      return {
+        url,
+        title,
+        canGoBack: focusedWebContents.canGoBack(),
+        canGoForward: focusedWebContents.canGoForward(),
+      };
+    } catch (error: any) {
+      console.error('tool:get_page_metadata error:', error.message);
       throw error;
     }
   });

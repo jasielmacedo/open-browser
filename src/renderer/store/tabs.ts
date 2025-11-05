@@ -60,8 +60,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     const newTabs = state.tabs.filter((t) => t.id !== tabId);
 
-    // If closing the last tab, create a new empty tab
+    // If closing the last tab, remove it first then create a new empty tab
     if (newTabs.length === 0) {
+      set({ tabs: [] }); // Clear tabs array first
       get().addTab(''); // Create new empty tab
       return;
     }
@@ -130,17 +131,24 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   loadTabs: async () => {
     try {
-      const savedTabs = await window.electron.invoke('tabs:load');
-      if (savedTabs && savedTabs.length > 0) {
-        const activeTab = savedTabs.find((t: Tab) => t.isActive);
-        set({
-          tabs: savedTabs,
-          activeTabId: activeTab?.id || savedTabs[0].id,
-        });
-      } else {
-        // No saved tabs, create a new one
-        get().addTab();
+      // Check if the app crashed (only restore tabs on crash)
+      const wasCrash = await window.electron.invoke('tabs:wasCrash');
+
+      if (wasCrash) {
+        // App crashed - restore previous session
+        const savedTabs = await window.electron.invoke('tabs:load');
+        if (savedTabs && savedTabs.length > 0) {
+          const activeTab = savedTabs.find((t: Tab) => t.isActive);
+          set({
+            tabs: savedTabs,
+            activeTabId: activeTab?.id || savedTabs[0].id,
+          });
+          return;
+        }
       }
+
+      // Normal start (no crash) or no saved tabs - create a new tab
+      get().addTab();
     } catch {
       // Silently create default tab if IPC not ready yet
       if (!get().tabs.length) {

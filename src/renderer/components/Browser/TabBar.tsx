@@ -20,7 +20,7 @@ export const TabBar: React.FC = () => {
   return (
     <div className="flex items-center bg-card border-b border-border overflow-x-auto">
       {/* Tabs */}
-      <div className="flex flex-1 items-center overflow-x-auto scrollbar-hide">
+      <div className="flex items-center overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <div
             key={tab.id}

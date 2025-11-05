@@ -15,7 +15,7 @@ export default defineConfig({
           build: {
             outDir: '../../dist/main',
             rollupOptions: {
-              external: ['better-sqlite3', 'electron'],
+              external: ['better-sqlite3', 'electron', 'sharp', 'jsdom', '@mozilla/readability'],
               output: {
                 entryFileNames: 'index.js',
                 format: 'cjs'

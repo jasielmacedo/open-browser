@@ -178,7 +178,12 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progres
         </div>
         {model.capabilities.vision && (
           <div className="flex-shrink-0" title="Supports vision">
-            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5 text-primary"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

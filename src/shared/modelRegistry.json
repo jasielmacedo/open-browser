@@ -11,7 +11,8 @@
       "capabilities": {
         "vision": true,
         "chat": true,
-        "completion": true
+        "completion": true,
+        "toolCalling": false
       },
       "recommended": true,
       "requiresGPU": false,

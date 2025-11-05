@@ -3,6 +3,8 @@ import { spawn, ChildProcess } from 'child_process';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
 
 export interface OllamaModel {
   name: string;
@@ -55,7 +57,7 @@ export interface GenerateResponse {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   images?: string[];
 }
@@ -65,6 +67,8 @@ export interface ChatRequest {
   messages: ChatMessage[];
   stream?: boolean;
   context?: AIContext;
+  tools?: any[]; // Tool definitions in Ollama format
+  planningMode?: boolean; // Enable tool calling behavior
 }
 
 export class OllamaService {
@@ -79,6 +83,10 @@ export class OllamaService {
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 120000, // 2 minutes for model operations
+      decompress: false, // Disable automatic decompression to match curl behavior
+      headers: {
+        'Accept-Encoding': 'identity', // Disable compression to match curl
+      },
     });
   }
 
@@ -156,7 +164,8 @@ export class OllamaService {
 
       if (content) {
         // Limit content to first 5000 characters to avoid token limits
-        const truncatedContent = content.length > 5000 ? content.substring(0, 5000) + '...' : content;
+        const truncatedContent =
+          content.length > 5000 ? content.substring(0, 5000) + '...' : content;
         contextParts.push(`\nPage Content:\n${truncatedContent}`);
       }
     }
@@ -164,18 +173,18 @@ export class OllamaService {
     // Add browsing history context
     if (context.browsingHistory && context.browsingHistory.length > 0) {
       contextParts.push('\n## Recent Browsing History');
-      const historyItems = context.browsingHistory.slice(0, 10).map(
-        (h: any) => `- ${h.title || 'Untitled'} (${h.url})`
-      );
+      const historyItems = context.browsingHistory
+        .slice(0, 10)
+        .map((h: any) => `- ${h.title || 'Untitled'} (${h.url})`);
       contextParts.push(historyItems.join('\n'));
     }
 
     // Add bookmarks context
     if (context.bookmarks && context.bookmarks.length > 0) {
       contextParts.push('\n## Bookmarks');
-      const bookmarkItems = context.bookmarks.slice(0, 10).map(
-        (b: any) => `- ${b.title || 'Untitled'} (${b.url})`
-      );
+      const bookmarkItems = context.bookmarks
+        .slice(0, 10)
+        .map((b: any) => `- ${b.title || 'Untitled'} (${b.url})`);
       contextParts.push(bookmarkItems.join('\n'));
     }
 
@@ -388,11 +397,11 @@ export class OllamaService {
               responseType: 'stream',
               timeout: 0, // No timeout for downloads
               // Add socket timeout to detect stalled connections
-              httpAgent: new (require('http').Agent)({
+              httpAgent: new http.Agent({
                 keepAlive: true,
                 timeout: 60000, // 60 second socket timeout
               }),
-              httpsAgent: new (require('https').Agent)({
+              httpsAgent: new https.Agent({
                 keepAlive: true,
                 timeout: 60000, // 60 second socket timeout
               }),
@@ -438,7 +447,7 @@ export class OllamaService {
                       clearInterval(heartbeatInterval);
                       throw new Error(progress.error || 'Unknown error during download');
                     }
-                  } catch (parseError) {
+                  } catch (_parseError) {
                     console.warn('Failed to parse progress line:', line);
                   }
                 }
@@ -459,11 +468,7 @@ export class OllamaService {
           const errorCode = error.code || 'UNKNOWN';
           const errorMessage = error.message || 'Unknown error';
 
-          console.error(
-            `Pull model attempt ${attempt + 1} failed:`,
-            errorCode,
-            errorMessage
-          );
+          console.error(`Pull model attempt ${attempt + 1} failed:`, errorCode, errorMessage);
 
           // If not retryable or max retries reached, throw
           if (!this.isRetryableError(error) || attempt >= maxRetries) {
@@ -595,52 +600,97 @@ export class OllamaService {
    * Chat completion with conversation history and context awareness
    * Returns an async generator for streaming responses
    */
-  async *chat(request: ChatRequest): AsyncGenerator<string> {
+  async *chat(request: ChatRequest): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] }> {
     await this.ensureRunning();
 
     try {
       let messages = [...request.messages];
 
-      // If context is provided, prepend it as a system message or enhance existing system message
+      // If context is provided, prepend it to the first user message instead of using system role
+      // This avoids Ollama 500 errors with llama3.2-vision when using system messages with streaming
       if (request.context) {
         const contextualSystem = this.buildContextualSystemPrompt('', request.context);
 
         if (contextualSystem) {
-          // Check if there's already a system message
-          const systemMessageIndex = messages.findIndex((m) => m.role === 'system');
-
-          if (systemMessageIndex >= 0) {
-            // Enhance existing system message
-            messages[systemMessageIndex] = {
-              ...messages[systemMessageIndex],
-              content: messages[systemMessageIndex].content + '\n\n' + contextualSystem,
+          // Find the first user message and prepend context
+          const firstUserIndex = messages.findIndex((m) => m.role === 'user');
+          if (firstUserIndex >= 0) {
+            messages[firstUserIndex] = {
+              ...messages[firstUserIndex],
+              content: contextualSystem + '\n\n' + messages[firstUserIndex].content,
             };
-          } else {
-            // Add new system message at the beginning
-            messages = [
-              {
-                role: 'system',
-                content: contextualSystem,
-              },
-              ...messages,
-            ];
           }
         }
       }
 
       // Build the request with enhanced messages
-      const ollamaRequest = {
+      const ollamaRequest: any = {
         model: request.model,
         messages: messages,
         stream: request.stream,
       };
 
-      const response = await this.client.post('/api/chat', ollamaRequest, {
-        responseType: 'stream',
-        timeout: 0,
+      // Add tools if planning mode is enabled
+      if (request.planningMode && request.tools && request.tools.length > 0) {
+        ollamaRequest.tools = request.tools;
+      }
+
+      console.log('[Ollama] Sending chat request:', JSON.stringify(ollamaRequest, null, 2));
+
+      // Check if any message has images to determine timeout
+      const hasImages = messages.some((m: any) => m.images && m.images.length > 0);
+      // Vision models with images can take 5+ minutes to process
+      const requestTimeout = hasImages ? 300000 : 60000; // 5 minutes for images, 60 seconds for text
+
+      console.log(`[Ollama] Using timeout: ${requestTimeout}ms (hasImages: ${hasImages})`);
+
+      // Use native Node.js http instead of axios for streaming to match curl behavior
+      const stream = await new Promise<any>((resolve, reject) => {
+        const data = JSON.stringify(ollamaRequest);
+        const options = {
+          hostname: 'localhost',
+          port: 11434,
+          path: '/api/chat',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data),
+            'Connection': 'keep-alive', // Keep connection alive for streaming
+          },
+          timeout: requestTimeout,
+        };
+
+        const req = http.request(options, (res) => {
+          console.log('[Ollama] Got response:', res.statusCode, res.statusMessage);
+
+          // Handle non-200 responses
+          if (res.statusCode !== 200) {
+            let errorBody = '';
+            res.on('data', chunk => errorBody += chunk);
+            res.on('end', () => {
+              reject(new Error(`HTTP ${res.statusCode}: ${errorBody}`));
+            });
+            return;
+          }
+
+          resolve(res);
+        });
+
+        req.on('error', (error) => {
+          console.error('[Ollama] Request error:', error);
+          reject(error);
+        });
+
+        req.on('timeout', () => {
+          console.error('[Ollama] Request timeout');
+          req.destroy();
+          reject(new Error('Request timeout'));
+        });
+
+        req.write(data);
+        req.end();
       });
 
-      const stream = response.data;
       let buffer = '';
 
       for await (const chunk of stream) {
@@ -652,6 +702,11 @@ export class OllamaService {
           if (line.trim()) {
             try {
               const data = JSON.parse(line);
+
+              // Check for tool calls
+              if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+              }
 
               if (data.message?.content) {
                 yield data.message.content;

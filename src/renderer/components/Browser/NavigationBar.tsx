@@ -2,9 +2,11 @@ import React, { useState, KeyboardEvent, RefObject, useEffect } from 'react';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
+import { useChatStore } from '../../store/chat';
 import { WebViewHandle } from './MultiWebViewContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
+import { supportsVision } from '../../../shared/modelRegistry';
 
 interface NavigationBarProps {
   webviewRef: RefObject<WebViewHandle>;
@@ -28,7 +30,8 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     toggleBookmarks,
   } = useBrowserStore();
   const { updateTab, activeTabId } = useTabsStore();
-  const { setIsModelManagerOpen } = useModelStore();
+  const { setIsModelManagerOpen, defaultModel } = useModelStore();
+  const { sendChatMessage } = useChatStore();
 
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -38,6 +41,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Sync inputValue with currentUrl when not focused (for tab changes)
+  useEffect(() => {
+    if (!isFocused) {
+      setInputValue('');
+    }
+  }, [currentUrl, isFocused]);
 
   // Check bookmark status when URL changes
   useEffect(() => {
@@ -158,6 +168,10 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   };
 
   const handleFocus = () => {
+    // Pre-populate with current URL when focusing
+    if (!inputValue && currentUrl) {
+      setInputValue(currentUrl);
+    }
     setIsFocused(true);
     // Select all on focus for easy editing
     setTimeout(() => {
@@ -210,11 +224,148 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     setShowMenu(true);
   };
 
+  const handleAskAI = async () => {
+    if (!defaultModel) {
+      alert('Please select a default model first');
+      return;
+    }
+
+    try {
+      // Capture page content based on model capability
+      const hasVision = supportsVision(defaultModel);
+      const capture = await window.electron.invoke(
+        hasVision ? 'capture:forVision' : 'capture:forText'
+      );
+
+      // Open chat if not already open
+      if (!isChatOpen) {
+        toggleChat();
+      }
+
+      // Send to AI with page context (this will add the user message and context info)
+      const prompt = hasVision
+        ? 'What is on this page? Please analyze the screenshot and content.'
+        : 'What is on this page? Please summarize the content.';
+
+      await sendChatMessage(prompt, capture.screenshot ? [capture.screenshot] : undefined, capture);
+    } catch (error) {
+      console.error('Failed to ask AI about page:', error);
+      alert('Failed to analyze page. Please try again.');
+    }
+  };
+
+  const handleExplainSelection = async () => {
+    if (!defaultModel) {
+      alert('Please select a default model first');
+      return;
+    }
+
+    try {
+      // Get selected text
+      const selectedText = await webviewRef.current?.executeJavaScript(
+        'window.getSelection().toString()'
+      );
+
+      if (!selectedText) {
+        alert('Please select some text first');
+        return;
+      }
+
+      // Open chat if not already open
+      if (!isChatOpen) {
+        toggleChat();
+      }
+
+      // Capture page context
+      const pageCapture = await window.electron.invoke('capture:forText');
+
+      // Send to AI with selected text in context
+      const prompt = `Please explain the following text:\n\n"${selectedText}"`;
+      await sendChatMessage(prompt, undefined, {
+        ...pageCapture,
+        selectedText,
+      });
+    } catch (error) {
+      console.error('Failed to explain selection:', error);
+      alert('Failed to explain text. Please try again.');
+    }
+  };
+
+  const handleSummarizePage = async () => {
+    if (!defaultModel) {
+      alert('Please select a default model first');
+      return;
+    }
+
+    try {
+      // Capture page content for text (for context)
+      const pageCapture = await window.electron.invoke('capture:forText');
+
+      // Open chat if not already open
+      if (!isChatOpen) {
+        toggleChat();
+      }
+
+      // Send to AI with page context
+      const prompt = 'Please provide a concise summary of this page.';
+      await sendChatMessage(prompt, undefined, pageCapture);
+    } catch (error) {
+      console.error('Failed to summarize page:', error);
+      alert('Failed to summarize page. Please try again.');
+    }
+  };
+
   // Check if URL is secure
   const isSecure = currentUrl.startsWith('https://');
   const hasUrl = !!currentUrl;
 
   const menuItems: ContextMenuItem[] = [
+    {
+      label: 'Ask AI about this page',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+          />
+        </svg>
+      ),
+      onClick: handleAskAI,
+      disabled: !hasUrl || !defaultModel,
+    },
+    {
+      label: 'Explain selected text',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+          />
+        </svg>
+      ),
+      onClick: handleExplainSelection,
+      disabled: !hasUrl || !defaultModel,
+    },
+    {
+      label: 'Summarize page',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 6h16M4 12h16M4 18h7"
+          />
+        </svg>
+      ),
+      onClick: handleSummarizePage,
+      disabled: !hasUrl || !defaultModel,
+    },
+    { label: '', separator: true, onClick: () => {} },
     {
       label: 'Zoom In',
       shortcut: 'Ctrl++',

@@ -280,7 +280,9 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
 
   // Update active tab info in browser store
   useEffect(() => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
     const activeWebview = getActiveWebview();
+
     if (activeWebview) {
       try {
         setCanGoBack(activeWebview.canGoBack());
@@ -288,10 +290,20 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         setCurrentUrl(activeWebview.getURL() || '');
         setPageTitle(activeWebview.getTitle() || '');
       } catch {
-        // Webview not ready yet
+        // Webview not ready yet - use tab data
+        setCurrentUrl(activeTab?.url || '');
+        setPageTitle(activeTab?.title || '');
+        setCanGoBack(false);
+        setCanGoForward(false);
       }
+    } else if (activeTab) {
+      // No webview yet (new tab or suspended), use tab data
+      setCurrentUrl(activeTab.url || '');
+      setPageTitle(activeTab.title || '');
+      setCanGoBack(false);
+      setCanGoForward(false);
     }
-  }, [activeTabId]);
+  }, [activeTabId, tabs]);
 
   // Navigate tab when URL changes (after initial mount)
   useEffect(() => {
@@ -387,7 +399,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                       d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
                     />
                   </svg>
-                  <h2 className="text-2xl font-semibold">Welcome to Browser-LLM</h2>
+                  <h2 className="text-2xl font-semibold">Welcome to Open Browser</h2>
                   <p className="text-muted-foreground">
                     Enter a URL or search query in the address bar to get started.
                   </p>
