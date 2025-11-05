@@ -1,0 +1,33 @@
+{
+  "appId": "com.browserllm.app",
+  "productName": "Browser-LLM",
+  "directories": {
+    "output": "build",
+    "buildResources": "resources"
+  },
+  "files": ["dist/**/*", "package.json"],
+  "extraResources": [
+    {
+      "from": "resources/bin",
+      "to": "bin",
+      "filter": ["**/*", "!*.zip"]
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "resources/icon.ico",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "resources/icon.icns",
+    "category": "public.app-category.productivity",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

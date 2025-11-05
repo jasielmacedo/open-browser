@@ -19,6 +19,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "package": "npm run build && electron-builder",
+    "setup:ollama": "node scripts/download-ollama.js",
+    "postinstall": "node scripts/download-ollama.js",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 50",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",

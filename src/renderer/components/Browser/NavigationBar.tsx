@@ -1,6 +1,7 @@
 import React, { useState, KeyboardEvent, RefObject, useEffect } from 'react';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
+import { useModelStore } from '../../store/models';
 import { WebViewHandle } from './MultiWebViewContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
@@ -27,6 +28,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     toggleBookmarks,
   } = useBrowserStore();
   const { updateTab, activeTabId } = useTabsStore();
+  const { setIsModelManagerOpen } = useModelStore();
 
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -549,6 +551,22 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
               strokeLinejoin="round"
               strokeWidth={2}
               d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+            />
+          </svg>
+        </button>
+
+        {/* Model Manager Button */}
+        <button
+          onClick={() => setIsModelManagerOpen(true)}
+          className="p-2 rounded hover:bg-accent transition-colors"
+          title="Model Manager (Ctrl+M)"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
             />
           </svg>
         </button>

@@ -4,6 +4,7 @@ import { app, BrowserWindow, session, Menu, MenuItem } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { databaseService } from './services/database';
+import { ollamaService } from './services/ollama';
 import { registerIpcHandlers } from './ipc/handlers';
 
 // Polyfill __dirname for ESM
@@ -76,7 +77,7 @@ const createWindow = () => {
 };
 
 // This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Initialize database
   databaseService.initialize();
 
@@ -87,6 +88,18 @@ app.whenReady().then(() => {
     console.log('IPC handlers registered successfully');
   } catch (error) {
     console.error('Failed to register IPC handlers:', error);
+  }
+
+  // Auto-start Ollama service
+  console.log('Starting Ollama service...');
+  try {
+    await ollamaService.ensureRunning();
+    console.log('Ollama service started successfully');
+  } catch (error) {
+    console.error('Failed to start Ollama service:', error);
+    console.error(
+      'The application will continue, but LLM features may not work until Ollama is started manually.'
+    );
   }
 
   // Setup download handling
@@ -155,6 +168,7 @@ app.on('window-all-closed', () => {
 // Cleanup on app quit
 app.on('before-quit', () => {
   databaseService.close();
+  ollamaService.stop();
 });
 
 // Security: Configure web contents behavior
