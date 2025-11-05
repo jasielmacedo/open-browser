@@ -15,7 +15,6 @@ export const ChatSidebar: React.FC = () => {
     setError,
     setPlanningMode,
     sendChatMessage,
-    clearMessages,
   } = useChatStore();
   const {
     models,
@@ -341,7 +340,8 @@ export const ChatSidebar: React.FC = () => {
                 <div className="mt-3 p-2 bg-accent rounded border border-border text-xs text-muted-foreground">
                   <p className="font-medium text-primary mb-1">Tool Calling Supported</p>
                   <p>
-                    Enable Planning Mode in the input area below to let the AI use tools for searching history, analyzing pages, and more.
+                    Enable Planning Mode in the input area below to let the AI use tools for
+                    searching history, analyzing pages, and more.
                   </p>
                 </div>
               )}
@@ -551,11 +551,14 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
                 </svg>
                 <div className="flex-1">
                   <div className="font-medium mb-1">Executing Tool: {message.toolCall?.name}</div>
-                  {message.toolCall?.arguments && Object.keys(message.toolCall.arguments).length > 0 && (
-                    <div className="text-xs opacity-75 mt-1">
-                      <code className="text-[10px]">{JSON.stringify(message.toolCall.arguments)}</code>
-                    </div>
-                  )}
+                  {message.toolCall?.arguments &&
+                    Object.keys(message.toolCall.arguments).length > 0 && (
+                      <div className="text-xs opacity-75 mt-1">
+                        <code className="text-[10px]">
+                          {JSON.stringify(message.toolCall.arguments)}
+                        </code>
+                      </div>
+                    )}
                 </div>
               </>
             ) : (

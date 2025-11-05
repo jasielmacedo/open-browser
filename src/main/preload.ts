@@ -38,6 +38,9 @@ const ALLOWED_INVOKE_CHANNELS = [
   'tool:analyze_page_content',
   'tool:capture_screenshot',
   'tool:get_page_metadata',
+  'tool:web_search',
+  'settings:get',
+  'settings:set',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -46,6 +49,10 @@ const ALLOWED_LISTEN_CHANNELS = [
   'ollama:generateToken',
   'ollama:chatToken',
   'ollama:toolCalls',
+  'ai-ask-about-selection',
+  'ai-explain-selection',
+  'ai-translate-selection',
+  'ai-summarize-selection',
 ];
 
 // Expose protected methods that allow the renderer process to use

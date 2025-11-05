@@ -328,7 +328,7 @@ export function registerIpcHandlers() {
     try {
       // Find the active webview (browser tab) instead of the chat window
       const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
         throw new Error('No active browser tab to capture screenshot');
@@ -347,11 +347,11 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('capture:forVision', async (event) => {
+  ipcMain.handle('capture:forVision', async (_event) => {
     try {
       // Find the active webview (browser tab) instead of the chat window
       const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
         throw new Error('No active browser tab for vision capture');
@@ -364,12 +364,12 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('capture:forText', async (event) => {
+  ipcMain.handle('capture:forText', async (_event) => {
     try {
       // Find the active webview (browser tab) instead of the chat window
       // Webviews have type 'webview' and are guest windows
       const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find(wc => wc.getType() === 'webview');
+      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
         throw new Error('No active browser tab for text capture');
@@ -484,65 +484,108 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('ollama:chat', async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[] }) => {
-    try {
-      if (!options || typeof options !== 'object') {
-        throw new Error('Invalid chat options');
-      }
-
-      validateString(options.model, 'Model name', 256);
-
-      if (!Array.isArray(options.messages)) {
-        throw new Error('Messages must be an array');
-      }
-
-      // Validate messages
-      for (const msg of options.messages) {
-        if (!msg || typeof msg !== 'object') {
-          throw new Error('Invalid message object');
+  ipcMain.handle(
+    'ollama:chat',
+    async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[] }) => {
+      try {
+        if (!options || typeof options !== 'object') {
+          throw new Error('Invalid chat options');
         }
-        validateString(msg.content, 'Message content', 50000);
-        if (!['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
-          throw new Error('Invalid message role');
+
+        validateString(options.model, 'Model name', 256);
+
+        if (!Array.isArray(options.messages)) {
+          throw new Error('Messages must be an array');
         }
+
+        // Validate messages
+        for (const msg of options.messages) {
+          if (!msg || typeof msg !== 'object') {
+            throw new Error('Invalid message object');
+          }
+          validateString(msg.content, 'Message content', 50000);
+          if (!['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
+            throw new Error('Invalid message role');
+          }
+        }
+
+        // Validate context if provided
+        if (options.context) {
+          if (options.context.page?.url) {
+            validateString(options.context.page.url, 'Page URL', 2048);
+          }
+          if (options.context.page?.title) {
+            validateString(options.context.page.title, 'Page title', 1024);
+          }
+        }
+
+        const messages = [...options.messages];
+
+        // Add system message if not already present
+        // System messages should be the first message in the conversation
+        if (messages.length === 0 || messages[0].role !== 'system') {
+          const systemPrompt =
+            databaseService.getSetting('system-prompt') ||
+            'You are a helpful AI assistant integrated into a web browser. Provide clear, concise, and accurate responses.';
+          const userInfo = databaseService.getSetting('user-info') || '';
+          const customInstructions = databaseService.getSetting('custom-instructions') || '';
+
+          // Get current date and time
+          const now = new Date();
+          const dateTimeInfo = `Current date and time: ${now.toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZoneName: 'short',
+          })}`;
+
+          // Build full system message
+          let fullSystemMessage = `${systemPrompt}\n\n${dateTimeInfo}`;
+          if (userInfo && userInfo.trim()) {
+            fullSystemMessage += `\n\nUser Information:\n${userInfo}`;
+          }
+          if (customInstructions && customInstructions.trim()) {
+            fullSystemMessage += `\n\nCustom Instructions:\n${customInstructions}`;
+          }
+
+          // Add system message as the first message
+          messages.unshift({
+            role: 'system',
+            content: fullSystemMessage,
+          });
+        }
+
+        // Stream response tokens back to renderer
+        const generator = ollamaService.chat({
+          model: options.model,
+          messages,
+          context: options.context,
+          stream: true,
+          planningMode: options.planningMode,
+          tools: options.tools,
+        });
+
+        for await (const token of generator) {
+          // Handle both string tokens and tool call objects
+          if (typeof token === 'string') {
+            event.sender.send('ollama:chatToken', token);
+          } else if (token.type === 'tool_calls') {
+            // Send tool calls to renderer for display
+            event.sender.send('ollama:toolCalls', token.tool_calls);
+          }
+        }
+
+        return { success: true };
+      } catch (error: any) {
+        console.error('ollama:chat error:', error.message);
+        throw error;
       }
-
-      // Validate context if provided
-      if (options.context) {
-        if (options.context.page?.url) {
-          validateString(options.context.page.url, 'Page URL', 2048);
-        }
-        if (options.context.page?.title) {
-          validateString(options.context.page.title, 'Page title', 1024);
-        }
-      }
-
-      // Stream response tokens back to renderer
-      const generator = ollamaService.chat({
-        model: options.model,
-        messages: options.messages,
-        context: options.context,
-        stream: true,
-        planningMode: options.planningMode,
-        tools: options.tools,
-      });
-
-      for await (const token of generator) {
-        // Handle both string tokens and tool call objects
-        if (typeof token === 'string') {
-          event.sender.send('ollama:chatToken', token);
-        } else if (token.type === 'tool_calls') {
-          // Send tool calls to renderer for display
-          event.sender.send('ollama:toolCalls', token.tool_calls);
-        }
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('ollama:chat error:', error.message);
-      throw error;
     }
-  });
+  );
 
   // Tool execution handlers
   ipcMain.handle('tool:search_history', async (event, args: any) => {
@@ -652,6 +695,55 @@ export function registerIpcHandlers() {
       };
     } catch (error: any) {
       console.error('tool:get_page_metadata error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tool:web_search', async (event, args: any) => {
+    try {
+      const query = args.query;
+      if (!query) {
+        throw new Error('Search query is required');
+      }
+
+      validateString(query, 'Search query', 2048);
+
+      const captureScreenshot = args.capture_screenshot !== false; // Default to true
+
+      // This is a placeholder - the actual implementation will be handled
+      // by the renderer process since it needs to coordinate with the tab system
+      // and webview. We return instructions for the renderer to execute.
+      return {
+        action: 'open_search_tab',
+        query,
+        url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+        captureScreenshot,
+        message: `Opening Google search for: "${query}"`,
+      };
+    } catch (error: any) {
+      console.error('tool:web_search error:', error.message);
+      throw error;
+    }
+  });
+
+  // Settings handlers
+  ipcMain.handle('settings:get', async (_event, key: string) => {
+    try {
+      validateString(key, 'Settings key', 256);
+      return databaseService.getSetting(key);
+    } catch (error: any) {
+      console.error('settings:get error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('settings:set', async (_event, key: string, value: string) => {
+    try {
+      validateString(key, 'Settings key', 256);
+      validateString(value, 'Settings value', 10000); // Allow long values for system prompts
+      return databaseService.setSetting(key, value);
+    } catch (error: any) {
+      console.error('settings:set error:', error.message);
       throw error;
     }
   });

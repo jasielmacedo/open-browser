@@ -373,6 +373,47 @@ app.on('web-contents-created', (event, contents) => {
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
+      // AI features for selected text
+      if (params.selectionText && params.selectionText.trim().length > 0) {
+        menu.append(
+          new MenuItem({
+            label: 'Ask AI about this',
+            click: () => {
+              mainWindow?.webContents.send('ai-ask-about-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Explain this',
+            click: () => {
+              mainWindow?.webContents.send('ai-explain-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Translate this',
+            click: () => {
+              mainWindow?.webContents.send('ai-translate-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Summarize this',
+            click: () => {
+              mainWindow?.webContents.send('ai-summarize-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
       // View Page Source
       menu.append(
         new MenuItem({

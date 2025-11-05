@@ -600,7 +600,9 @@ export class OllamaService {
    * Chat completion with conversation history and context awareness
    * Returns an async generator for streaming responses
    */
-  async *chat(request: ChatRequest): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] }> {
+  async *chat(
+    request: ChatRequest
+  ): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] }> {
     await this.ensureRunning();
 
     try {
@@ -655,7 +657,7 @@ export class OllamaService {
           headers: {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data),
-            'Connection': 'keep-alive', // Keep connection alive for streaming
+            Connection: 'keep-alive', // Keep connection alive for streaming
           },
           timeout: requestTimeout,
         };
@@ -666,7 +668,7 @@ export class OllamaService {
           // Handle non-200 responses
           if (res.statusCode !== 200) {
             let errorBody = '';
-            res.on('data', chunk => errorBody += chunk);
+            res.on('data', (chunk) => (errorBody += chunk));
             res.on('end', () => {
               reject(new Error(`HTTP ${res.statusCode}: ${errorBody}`));
             });

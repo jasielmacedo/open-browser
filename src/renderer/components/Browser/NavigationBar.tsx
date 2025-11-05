@@ -6,6 +6,7 @@ import { useChatStore } from '../../store/chat';
 import { WebViewHandle } from './MultiWebViewContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
+import { SystemPromptSettings } from '../Settings/SystemPromptSettings';
 import { supportsVision } from '../../../shared/modelRegistry';
 
 interface NavigationBarProps {
@@ -31,7 +32,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   } = useBrowserStore();
   const { updateTab, activeTabId } = useTabsStore();
   const { setIsModelManagerOpen, defaultModel } = useModelStore();
-  const { sendChatMessage } = useChatStore();
+  const { sendChatMessage, setCurrentModel } = useChatStore();
 
   const [inputValue, setInputValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -41,6 +42,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [showSystemPromptSettings, setShowSystemPromptSettings] = useState(false);
 
   // Sync inputValue with currentUrl when not focused (for tab changes)
   useEffect(() => {
@@ -60,6 +62,69 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       setIsBookmarked(false);
     }
   }, [currentUrl, setIsBookmarked]);
+
+  // Listen for AI context menu actions from webview
+  useEffect(() => {
+    const handleAIAsk = async (selectedText: string) => {
+      if (!defaultModel) {
+        alert('Please select a default model first');
+        return;
+      }
+      setCurrentModel(defaultModel);
+      if (!isChatOpen) {
+        toggleChat();
+      }
+      await sendChatMessage(`Can you help me with this: "${selectedText}"`);
+    };
+
+    const handleAIExplain = async (selectedText: string) => {
+      if (!defaultModel) {
+        alert('Please select a default model first');
+        return;
+      }
+      setCurrentModel(defaultModel);
+      if (!isChatOpen) {
+        toggleChat();
+      }
+      await sendChatMessage(`Please explain this: "${selectedText}"`);
+    };
+
+    const handleAITranslate = async (selectedText: string) => {
+      if (!defaultModel) {
+        alert('Please select a default model first');
+        return;
+      }
+      setCurrentModel(defaultModel);
+      if (!isChatOpen) {
+        toggleChat();
+      }
+      await sendChatMessage(`Please translate this to English: "${selectedText}"`);
+    };
+
+    const handleAISummarize = async (selectedText: string) => {
+      if (!defaultModel) {
+        alert('Please select a default model first');
+        return;
+      }
+      setCurrentModel(defaultModel);
+      if (!isChatOpen) {
+        toggleChat();
+      }
+      await sendChatMessage(`Please summarize this: "${selectedText}"`);
+    };
+
+    const unsubAsk = window.electron.on('ai-ask-about-selection', handleAIAsk);
+    const unsubExplain = window.electron.on('ai-explain-selection', handleAIExplain);
+    const unsubTranslate = window.electron.on('ai-translate-selection', handleAITranslate);
+    const unsubSummarize = window.electron.on('ai-summarize-selection', handleAISummarize);
+
+    return () => {
+      unsubAsk();
+      unsubExplain();
+      unsubTranslate();
+      unsubSummarize();
+    };
+  }, [defaultModel, isChatOpen, toggleChat, sendChatMessage, setCurrentModel]);
 
   const handleToggleBookmark = async () => {
     if (!currentUrl) return;
@@ -108,7 +173,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     }
   }, [inputValue, isFocused]);
 
-  const handleNavigate = () => {
+  const handleNavigate = async () => {
     if (!inputValue.trim()) return;
 
     let url = inputValue.trim();
@@ -119,8 +184,25 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       if (url.includes('.') && !url.includes(' ')) {
         url = 'https://' + url;
       } else {
-        // Treat as search query
-        url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
+        // Treat as AI prompt - send to chat
+        if (!defaultModel) {
+          alert('Please select a default model first to use AI chat');
+          return;
+        }
+
+        // Set the current model for the chat
+        setCurrentModel(defaultModel);
+
+        // Open chat if not already open
+        if (!isChatOpen) {
+          toggleChat();
+        }
+
+        // Send the query to AI
+        await sendChatMessage(url);
+        setInputValue('');
+        (document.activeElement as HTMLInputElement)?.blur();
+        return;
       }
     }
 
@@ -219,9 +301,21 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   };
 
   const handleMenuClick = (e: React.MouseEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenuPosition({ x: rect.right - 200, y: rect.bottom + 4 });
-    setShowMenu(true);
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (showMenu) {
+      setShowMenu(false);
+    } else {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setMenuPosition({ x: rect.right - 200, y: rect.bottom + 4 });
+      setShowMenu(true);
+    }
+  };
+
+  const handleMenuMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleAskAI = async () => {
@@ -364,6 +458,27 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       ),
       onClick: handleSummarizePage,
       disabled: !hasUrl || !defaultModel,
+    },
+    { label: '', separator: true, onClick: () => {} },
+    {
+      label: 'System Prompt Settings',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        </svg>
+      ),
+      onClick: () => setShowSystemPromptSettings(true),
     },
     { label: '', separator: true, onClick: () => {} },
     {
@@ -743,6 +858,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
         {/* Three-dots Menu Button */}
         <button
           onClick={handleMenuClick}
+          onMouseDown={handleMenuMouseDown}
           className="p-2 rounded hover:bg-accent transition-colors"
           title="More options"
         >
@@ -776,6 +892,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </div>
       )}
+
+      {/* System Prompt Settings Modal */}
+      <SystemPromptSettings
+        isOpen={showSystemPromptSettings}
+        onClose={() => setShowSystemPromptSettings(false)}
+      />
     </div>
   );
 };

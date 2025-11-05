@@ -150,6 +150,25 @@ class DatabaseService {
         updated_at INTEGER NOT NULL
       );
     `);
+
+    // Initialize default system prompt if not exists
+    const systemPrompt = this.getSetting('system-prompt');
+    if (!systemPrompt) {
+      this.setSetting(
+        'system-prompt',
+        'You are a helpful AI assistant integrated into a web browser. Provide clear, concise, and accurate responses.'
+      );
+    }
+
+    const userInfo = this.getSetting('user-info');
+    if (!userInfo) {
+      this.setSetting('user-info', '');
+    }
+
+    const customInstructions = this.getSetting('custom-instructions');
+    if (!customInstructions) {
+      this.setSetting('custom-instructions', '');
+    }
   }
 
   // History operations
@@ -490,9 +509,9 @@ class DatabaseService {
   getSetting(key: string): string | null {
     if (!this.db) throw new Error('Database not initialized');
 
-    const row = this.db
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get(key) as { value: string } | undefined;
+    const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined;
 
     return row ? row.value : null;
   }

@@ -358,7 +358,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Only send context on the first message or when explicitly provided
       // This prevents context from being duplicated in every request
-      const isFirstMessage = currentState.messages.filter(m => m.role === 'user').length === 1;
+      const isFirstMessage = currentState.messages.filter((m) => m.role === 'user').length === 1;
       const contextToSend = isFirstMessage ? context : undefined;
 
       console.log('[Chat] Sending request:', {

@@ -37,7 +37,8 @@ export interface ToolResult {
 export const AVAILABLE_TOOLS: Tool[] = [
   {
     name: 'search_history',
-    description: 'Search the browsing history for pages matching a query. Returns recent pages visited.',
+    description:
+      'Search the browsing history for pages matching a query. Returns recent pages visited.',
     parameters: [
       {
         name: 'query',
@@ -112,6 +113,31 @@ export const AVAILABLE_TOOLS: Tool[] = [
         return await window.electron.invoke('tool:get_page_metadata', args);
       }
       return { tool: 'get_page_metadata', args };
+    },
+  },
+  {
+    name: 'web_search',
+    description:
+      'Perform a web search by opening a new tab with the search query, navigating to Google, and capturing the results. This is a multi-step process that returns search results with screenshots.',
+    parameters: [
+      {
+        name: 'query',
+        type: 'string',
+        description: 'The search query to look up on Google',
+        required: true,
+      },
+      {
+        name: 'capture_screenshot',
+        type: 'boolean',
+        description: 'Whether to capture a screenshot of the search results (default: true)',
+        required: false,
+      },
+    ],
+    execute: async (args) => {
+      if (typeof window !== 'undefined' && window.electron) {
+        return await window.electron.invoke('tool:web_search', args);
+      }
+      return { tool: 'web_search', args };
     },
   },
 ];
@@ -194,11 +220,11 @@ export function parseToolCalls(content: string): ToolCall[] {
           name: callData.name,
           arguments: callData.arguments || {},
         });
-      } catch (e) {
+      } catch (_e) {
         console.warn('Failed to parse tool call:', match[1]);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     console.warn('Failed to extract tool calls from response');
   }
 
