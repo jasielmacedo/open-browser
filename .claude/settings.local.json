@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pnpm init:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(git init:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(npm uninstall:*)",
+      "Read(//c/Users/jasie/OneDrive/Pictures/Screenshots/**)",
+      "Bash(npx electron-builder install-app-deps)",
+      "Bash(npx electron-rebuild -f -w better-sqlite3)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
