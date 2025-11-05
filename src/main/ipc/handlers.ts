@@ -6,6 +6,8 @@ import {
   validateString,
   validateBoolean,
 } from '../utils/validation';
+import { ollamaService } from '../services/ollama';
+import type { GenerateOptions, ChatOptions } from '../../shared/types';
 
 export function registerIpcHandlers() {
   console.log('registerIpcHandlers called');
@@ -245,6 +247,138 @@ export function registerIpcHandlers() {
       return `view-source:${url}`;
     } catch (error: any) {
       console.error('webview:viewSource validation error:', error.message);
+      throw error;
+    }
+  });
+
+  // Ollama/LLM handlers
+  ipcMain.handle('ollama:isRunning', async () => {
+    try {
+      return await ollamaService.isRunning();
+    } catch (error: any) {
+      console.error('ollama:isRunning error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:start', async () => {
+    try {
+      await ollamaService.start();
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:start error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:listModels', async () => {
+    try {
+      return await ollamaService.listModels();
+    } catch (error: any) {
+      console.error('ollama:listModels error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:pullModel', async (event, modelName: string) => {
+    try {
+      validateString(modelName, 'Model name', 256);
+
+      // Stream progress updates back to renderer
+      const generator = ollamaService.pullModel(modelName);
+
+      for await (const progress of generator) {
+        event.sender.send('ollama:pullProgress', progress);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:pullModel error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:deleteModel', async (event, modelName: string) => {
+    try {
+      validateString(modelName, 'Model name', 256);
+      await ollamaService.deleteModel(modelName);
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:deleteModel error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:generate', async (event, options: GenerateOptions) => {
+    try {
+      if (!options || typeof options !== 'object') {
+        throw new Error('Invalid generate options');
+      }
+
+      validateString(options.model, 'Model name', 256);
+      validateString(options.prompt, 'Prompt', 50000);
+
+      if (options.system) {
+        validateString(options.system, 'System prompt', 10000);
+      }
+
+      // Stream response tokens back to renderer
+      const generator = ollamaService.generate({
+        model: options.model,
+        prompt: options.prompt,
+        images: options.images,
+        system: options.system,
+        stream: true,
+      });
+
+      for await (const token of generator) {
+        event.sender.send('ollama:generateToken', token);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:generate error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('ollama:chat', async (event, options: ChatOptions) => {
+    try {
+      if (!options || typeof options !== 'object') {
+        throw new Error('Invalid chat options');
+      }
+
+      validateString(options.model, 'Model name', 256);
+
+      if (!Array.isArray(options.messages)) {
+        throw new Error('Messages must be an array');
+      }
+
+      // Validate messages
+      for (const msg of options.messages) {
+        if (!msg || typeof msg !== 'object') {
+          throw new Error('Invalid message object');
+        }
+        validateString(msg.content, 'Message content', 50000);
+        if (!['system', 'user', 'assistant'].includes(msg.role)) {
+          throw new Error('Invalid message role');
+        }
+      }
+
+      // Stream response tokens back to renderer
+      const generator = ollamaService.chat({
+        model: options.model,
+        messages: options.messages,
+        stream: true,
+      });
+
+      for await (const token of generator) {
+        event.sender.send('ollama:chatToken', token);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:chat error:', error.message);
       throw error;
     }
   });

@@ -33,3 +33,45 @@ export interface Tab {
   isSuspended?: boolean;
   lastActiveTime?: number;
 }
+
+// LLM/Ollama related types
+export interface OllamaModel {
+  name: string;
+  size: number;
+  digest: string;
+  modified_at: string;
+}
+
+export interface PullProgress {
+  status: string;
+  completed?: number;
+  total?: number;
+  digest?: string;
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  images?: string[];
+  timestamp?: number;
+}
+
+export interface Conversation {
+  id: string;
+  messages: ChatMessage[];
+  model: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GenerateOptions {
+  model: string;
+  prompt: string;
+  images?: string[];
+  system?: string;
+}
+
+export interface ChatOptions {
+  model: string;
+  messages: ChatMessage[];
+}

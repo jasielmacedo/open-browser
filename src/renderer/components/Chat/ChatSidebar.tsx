@@ -1,29 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChatStore, Message } from '../../store/chat';
 import { useBrowserStore } from '../../store/browser';
+import { useModelStore } from '../../store/models';
 
 export const ChatSidebar: React.FC = () => {
-  const { messages, isStreaming, currentModel, addMessage } = useChatStore();
+  const {
+    messages,
+    isStreaming,
+    currentModel,
+    addMessage,
+    appendToLastMessage,
+    setIsStreaming,
+    setCurrentModel,
+    setError,
+    startNewMessage,
+  } = useChatStore();
+  const { models, isOllamaRunning, setModels, setIsOllamaRunning } = useModelStore();
   const { isChatOpen, toggleChat } = useBrowserStore();
   const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
+  // Load models on mount
+  useEffect(() => {
+    const checkOllama = async () => {
+      try {
+        const running = await window.electron.invoke('ollama:isRunning');
+        setIsOllamaRunning(running);
 
-    addMessage({
-      role: 'user',
-      content: input.trim(),
-    });
+        if (running) {
+          const modelList = await window.electron.invoke('ollama:listModels');
+          setModels(modelList);
 
+          // Set default model if none selected
+          if (!currentModel && modelList.length > 0) {
+            setCurrentModel(modelList[0].name);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check Ollama:', error);
+        setIsOllamaRunning(false);
+      }
+    };
+
+    if (isChatOpen) {
+      checkOllama();
+    }
+  }, [isChatOpen]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming || !currentModel) return;
+
+    const userMessage = input.trim();
     setInput('');
 
-    // TODO: Implement actual LLM call
-    setTimeout(() => {
-      addMessage({
-        role: 'assistant',
-        content: 'LLM integration coming soon! This is a placeholder response.',
+    // Add user message
+    addMessage({
+      role: 'user',
+      content: userMessage,
+    });
+
+    // Start assistant message
+    setIsStreaming(true);
+    setError(null);
+    startNewMessage('assistant');
+
+    try {
+      // Set up streaming listener
+      const unsubscribe = window.electron.on('ollama:chatToken', (token: string) => {
+        appendToLastMessage(token);
       });
-    }, 500);
+
+      // Convert messages to Ollama format
+      const chatMessages = messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // Add the new user message
+      chatMessages.push({
+        role: 'user' as const,
+        content: userMessage,
+      });
+
+      // Send chat request
+      await window.electron.invoke('ollama:chat', {
+        model: currentModel,
+        messages: chatMessages,
+      });
+
+      // Cleanup listener
+      unsubscribe();
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      setError(error.message || 'Failed to get response from AI');
+    } finally {
+      setIsStreaming(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -73,19 +150,27 @@ export const ChatSidebar: React.FC = () => {
 
       {/* Model Selector */}
       <div className="p-3 border-b border-border">
-        <select
-          className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
-          value={currentModel || ''}
-          onChange={(e) => {
-            // TODO: Implement model selection
-            console.log('Select model:', e.target.value);
-          }}
-        >
-          <option value="">Select a model...</option>
-          <option value="llava">LLaVA 7B (Not installed)</option>
-          <option value="bakllava">BakLLaVA 7B (Not installed)</option>
-          <option value="moondream">Moondream 2B (Not installed)</option>
-        </select>
+        {!isOllamaRunning ? (
+          <div className="text-sm text-muted-foreground text-center py-2">
+            Ollama is not running. Please start Ollama to use the AI assistant.
+          </div>
+        ) : models.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-2">
+            No models installed. Please pull a model first.
+          </div>
+        ) : (
+          <select
+            className="w-full px-3 py-2 bg-secondary border border-input rounded text-sm focus:outline-none focus:border-primary transition-colors"
+            value={currentModel || ''}
+            onChange={(e) => setCurrentModel(e.target.value)}
+          >
+            {models.map((model) => (
+              <option key={model.name} value={model.name}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Messages */}
@@ -136,6 +221,7 @@ export const ChatSidebar: React.FC = () => {
             <span>AI is thinking...</span>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -152,7 +238,7 @@ export const ChatSidebar: React.FC = () => {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={!input.trim() || isStreaming || !currentModel || !isOllamaRunning}
             className="px-3 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Send message"
           >
