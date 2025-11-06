@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, webContents, dialog, shell } from 'electron';
 import path from 'path';
-import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
+import { databaseService, HistoryEntry, Bookmark, Tab, Download } from '../services/database';
 import {
   validateUrl,
   validatePositiveInteger,
@@ -9,6 +9,8 @@ import {
 } from '../utils/validation';
 import { ollamaService } from '../services/ollama';
 import { captureService } from '../services/capture';
+import { downloadService } from '../services/download';
+import { createDownloadManagerWindow } from '../index';
 import type { GenerateOptions, ChatOptions } from '../../shared/types';
 
 export function registerIpcHandlers() {
@@ -922,6 +924,182 @@ When Planning Mode is enabled, you have access to these tools:
       return { success: true };
     } catch (error: any) {
       console.error('ollama:stop error:', error.message);
+      throw error;
+    }
+  });
+
+  // Download handlers
+  ipcMain.handle('download:getAll', async (_event, limit?: number, offset?: number) => {
+    try {
+      if (limit !== undefined) {
+        validatePositiveInteger(limit, 'Limit');
+      }
+      if (offset !== undefined) {
+        validatePositiveInteger(offset, 'Offset');
+      }
+      return downloadService.getDownloads(limit, offset);
+    } catch (error: any) {
+      console.error('download:getAll error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:getActive', async () => {
+    try {
+      return downloadService.getActiveDownloads();
+    } catch (error: any) {
+      console.error('download:getActive error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:pause', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      return downloadService.pauseDownload(id);
+    } catch (error: any) {
+      console.error('download:pause error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:resume', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      return downloadService.resumeDownload(id);
+    } catch (error: any) {
+      console.error('download:resume error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:cancel', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      return downloadService.cancelDownload(id);
+    } catch (error: any) {
+      console.error('download:cancel error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:open', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      return downloadService.openDownload(id);
+    } catch (error: any) {
+      console.error('download:open error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:showInFolder', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      return downloadService.showInFolder(id);
+    } catch (error: any) {
+      console.error('download:showInFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:delete', async (_event, id: number) => {
+    try {
+      validatePositiveInteger(id, 'Download ID');
+      downloadService.deleteDownload(id);
+      return { success: true };
+    } catch (error: any) {
+      console.error('download:delete error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:clear', async (_event, olderThan?: number) => {
+    try {
+      if (olderThan !== undefined) {
+        validatePositiveInteger(olderThan, 'Older than timestamp');
+      }
+      downloadService.clearDownloads(olderThan);
+      return { success: true };
+    } catch (error: any) {
+      console.error('download:clear error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:getDefaultFolder', async () => {
+    try {
+      return downloadService.getDefaultDownloadFolder();
+    } catch (error: any) {
+      console.error('download:getDefaultFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:chooseFolder', async () => {
+    try {
+      const window = BrowserWindow.getFocusedWindow();
+      const folder = await downloadService.chooseDownloadFolder(window);
+      if (folder) {
+        downloadService.setDefaultDownloadFolder(folder);
+        return folder;
+      }
+      return null;
+    } catch (error: any) {
+      console.error('download:chooseFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:chooseSaveLocation', async (_event, defaultFilename: string) => {
+    try {
+      validateString(defaultFilename, 'Filename', 255);
+      const window = BrowserWindow.getFocusedWindow();
+      return await downloadService.chooseSaveLocation(window, defaultFilename);
+    } catch (error: any) {
+      console.error('download:chooseSaveLocation error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('download:openManager', () => {
+    try {
+      createDownloadManagerWindow();
+      return { success: true };
+    } catch (error: any) {
+      console.error('download:openManager error:', error.message);
+      throw error;
+    }
+  });
+
+  // Save image with "Save As" dialog
+  ipcMain.handle('download:saveImage', async (_event, imageUrl: string, suggestedName?: string) => {
+    try {
+      validateUrl(imageUrl, 'Image URL');
+      if (suggestedName) {
+        validateString(suggestedName, 'Suggested name', 255);
+      }
+
+      const window = BrowserWindow.getFocusedWindow();
+      if (!window) {
+        throw new Error('No focused window');
+      }
+
+      // Extract filename from URL if not provided
+      const filename = suggestedName || path.basename(new URL(imageUrl).pathname) || 'image.png';
+
+      // Show save dialog
+      const savePath = await downloadService.chooseSaveLocation(window, filename);
+      if (!savePath) {
+        return { success: false, cancelled: true };
+      }
+
+      // Trigger download by asking webContents to download the URL
+      window.webContents.downloadURL(imageUrl);
+
+      return { success: true, savePath };
+    } catch (error: any) {
+      console.error('download:saveImage error:', error.message);
       throw error;
     }
   });
