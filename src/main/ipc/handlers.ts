@@ -1094,7 +1094,10 @@ When Planning Mode is enabled, you have access to these tools:
         return { success: false, cancelled: true };
       }
 
-      // Trigger download by asking webContents to download the URL
+      // Register the custom save path for this URL
+      downloadService.setCustomSavePath(imageUrl, savePath);
+
+      // Trigger download - will use the custom path
       window.webContents.downloadURL(imageUrl);
 
       return { success: true, savePath };

@@ -249,9 +249,19 @@ app.whenReady().then(async () => {
 
   // Setup download handling with the download service
   session.defaultSession.on('will-download', (_event, item, webContents) => {
-    const filename = downloadService.sanitizeFilename(item.getFilename());
-    const downloadFolder = downloadService.getDefaultDownloadFolder();
-    const savePath = downloadService.getUniqueFilename(downloadFolder, filename);
+    // Check if there's a custom save path for this URL (e.g., from Save Image As)
+    const customPath = downloadService.getCustomSavePath(item.getURL());
+
+    let savePath: string;
+    if (customPath) {
+      // Use the custom path chosen by user
+      savePath = customPath;
+    } else {
+      // Use default download folder with unique filename
+      const filename = downloadService.sanitizeFilename(item.getFilename());
+      const downloadFolder = downloadService.getDefaultDownloadFolder();
+      savePath = downloadService.getUniqueFilename(downloadFolder, filename);
+    }
 
     // Handle the download with the service
     downloadService.handleDownload(item, savePath, webContents);
@@ -456,13 +466,15 @@ app.on('web-contents-created', (event, contents) => {
             click: async () => {
               try {
                 const imageUrl = params.srcURL;
-                const suggestedName = path.basename(new URL(imageUrl).pathname);
+                const suggestedName = path.basename(new URL(imageUrl).pathname) || 'image.png';
                 const savePath = await downloadService.chooseSaveLocation(
                   mainWindow,
-                  suggestedName || 'image.png'
+                  suggestedName
                 );
                 if (savePath) {
-                  // Trigger download
+                  // Register the custom save path for this URL
+                  downloadService.setCustomSavePath(imageUrl, savePath);
+                  // Trigger download - will use the custom path
                   contents.downloadURL(imageUrl);
                 }
               } catch (error) {

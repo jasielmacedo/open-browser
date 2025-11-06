@@ -1,11 +1,11 @@
-import { app, BrowserWindow, dialog, DownloadItem } from 'electron';
+import { app, BrowserWindow, dialog, DownloadItem, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { databaseService, Download } from './database';
 
 class DownloadService {
   private activeDownloads: Map<number, DownloadItem> = new Map();
-  private downloadIdCounter = 0;
+  private pendingCustomPaths: Map<string, string> = new Map(); // URL -> custom save path
 
   /**
    * Get the default download folder
@@ -110,11 +110,34 @@ class DownloadService {
   }
 
   /**
+   * Register a custom save path for a download URL
+   * This is used when user chooses a specific location (e.g., Save Image As)
+   */
+  setCustomSavePath(url: string, savePath: string): void {
+    this.pendingCustomPaths.set(url, savePath);
+    // Auto-cleanup after 30 seconds in case download doesn't start
+    setTimeout(() => {
+      this.pendingCustomPaths.delete(url);
+    }, 30000);
+  }
+
+  /**
+   * Get custom save path for a URL if one was registered
+   */
+  getCustomSavePath(url: string): string | null {
+    const customPath = this.pendingCustomPaths.get(url);
+    if (customPath) {
+      this.pendingCustomPaths.delete(url);
+      return customPath;
+    }
+    return null;
+  }
+
+  /**
    * Handle download item and save to database
    */
   handleDownload(item: DownloadItem, savePath: string, webContents: Electron.WebContents): number {
     const filename = path.basename(savePath);
-    const downloadId = ++this.downloadIdCounter;
 
     // Create download record in database
     const dbId = databaseService.addDownload({
@@ -241,7 +264,7 @@ class DownloadService {
    * Open download in system file explorer
    */
   openDownload(id: number): boolean {
-    const download = databaseService.getDownloads(100).find((d) => d.id === id);
+    const download = databaseService.getDownload(id);
     if (download && download.state === 'completed' && fs.existsSync(download.savePath)) {
       shell.openPath(download.savePath);
       return true;
@@ -253,7 +276,7 @@ class DownloadService {
    * Show download in folder
    */
   showInFolder(id: number): boolean {
-    const download = databaseService.getDownloads(100).find((d) => d.id === id);
+    const download = databaseService.getDownload(id);
     if (download && fs.existsSync(download.savePath)) {
       shell.showItemInFolder(download.savePath);
       return true;
@@ -292,4 +315,3 @@ class DownloadService {
 }
 
 export const downloadService = new DownloadService();
-export { shell };

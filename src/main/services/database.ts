@@ -635,6 +635,24 @@ class DatabaseService {
     this.db.prepare(query).run(...values);
   }
 
+  getDownload(id: number): Download | null {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = this.db
+      .prepare(
+        `
+      SELECT id, url, filename, save_path as savePath, total_bytes as totalBytes,
+             received_bytes as receivedBytes, state, mime_type as mimeType,
+             start_time as startTime, end_time as endTime, error
+      FROM downloads
+      WHERE id = ?
+    `
+      )
+      .get(id) as Download | undefined;
+
+    return result || null;
+  }
+
   getDownloads(limit = 100, offset = 0): Download[] {
     if (!this.db) throw new Error('Database not initialized');
 
