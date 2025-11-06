@@ -339,127 +339,127 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
     <>
       <div className="flex-1 relative bg-background">
         {tabs.map((tab) => {
-        const isVisible = tab.id === activeTabId;
-        const shouldRenderWebview = !tab.isSuspended;
+          const isVisible = tab.id === activeTabId;
+          const shouldRenderWebview = !tab.isSuspended;
 
-        return (
-          <div key={tab.id} className={`absolute inset-0 ${isVisible ? 'block' : 'hidden'}`}>
-            {/* Suspended Tab Placeholder */}
-            {tab.isSuspended && isVisible && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 bg-background">
-                <div className="space-y-4 max-w-md">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
-                    {tab.favicon ? (
-                      <img src={tab.favicon} alt="" className="w-8 h-8" />
-                    ) : (
-                      <svg
-                        className="w-8 h-8 text-muted-foreground"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  <h2 className="text-xl font-semibold">Tab Suspended</h2>
-                  <p className="text-muted-foreground">This tab was suspended to save memory.</p>
-                  <p className="text-sm text-muted-foreground truncate max-w-full">
-                    {tab.title || tab.url || 'No title'}
-                  </p>
-                  <button
-                    onClick={() => {
-                      const { unsuspendTab } = useTabsStore.getState();
-                      unsuspendTab(tab.id);
-                    }}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    Reload Tab
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Welcome Screen Overlay - shown when no URL */}
-            {!tab.url && !tab.isSuspended && isVisible && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-background">
-                <div className="space-y-6 max-w-md">
-                  <svg
-                    className="w-16 h-16 mx-auto text-muted-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-                    />
-                  </svg>
-                  <h2 className="text-2xl font-semibold">Welcome to Open Browser</h2>
-                  <p className="text-muted-foreground">
-                    Enter a URL or search query in the address bar to get started.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Click the AI button to chat with local models about any page.
-                  </p>
-
-                  {/* Personality Selection Button */}
-                  <div className="pt-4">
-                    <button
-                      onClick={() => setIsPersonalitySelectorOpen(true)}
-                      className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-lg"
-                    >
-                      Choose AI Personality
-                    </button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Customize how your AI assistant talks to you
+          return (
+            <div key={tab.id} className={`absolute inset-0 ${isVisible ? 'block' : 'hidden'}`}>
+              {/* Suspended Tab Placeholder */}
+              {tab.isSuspended && isVisible && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 bg-background">
+                  <div className="space-y-4 max-w-md">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                      {tab.favicon ? (
+                        <img src={tab.favicon} alt="" className="w-8 h-8" />
+                      ) : (
+                        <svg
+                          className="w-8 h-8 text-muted-foreground"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <h2 className="text-xl font-semibold">Tab Suspended</h2>
+                    <p className="text-muted-foreground">This tab was suspended to save memory.</p>
+                    <p className="text-sm text-muted-foreground truncate max-w-full">
+                      {tab.title || tab.url || 'No title'}
                     </p>
+                    <button
+                      onClick={() => {
+                        const { unsuspendTab } = useTabsStore.getState();
+                        unsuspendTab(tab.id);
+                      }}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                    >
+                      Reload Tab
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* WebView - only render if not suspended and has URL */}
-            {shouldRenderWebview && tab.url && (
-              <webview
-                ref={(el) => {
-                  if (el) {
-                    webviewRefs.current[tab.id] = el;
-                    // Setup listeners on mount
-                    const cleanup = setupWebviewListeners(el, tab.id);
-                    // Store cleanup function
-                    (el as any).__cleanup = cleanup;
-                  } else if (webviewRefs.current[tab.id]) {
-                    // Cleanup on unmount
-                    const cleanup = (webviewRefs.current[tab.id] as any).__cleanup;
-                    if (cleanup) cleanup();
-                    delete webviewRefs.current[tab.id];
-                  }
-                }}
-                src={tab.url}
-                className="w-full h-full"
-                // @ts-ignore - webview is a custom Electron element
-                // Security: Use persistent partition for session data
-                partition="persist:main"
-                // Security: Disable popups to prevent popup spam and phishing
-                allowpopups="false"
-                // Security: Enable context isolation, allow javascript and plugins for full browsing
-                // Note: Webviews are sandboxed separately from the main renderer process
-                webpreferences="contextIsolation=true,javascript=yes,plugins=yes,sandbox=true"
-                // User agent string for compatibility
-                useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-              />
-            )}
-          </div>
-        );
-      })}
+              {/* Welcome Screen Overlay - shown when no URL */}
+              {!tab.url && !tab.isSuspended && isVisible && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-background">
+                  <div className="space-y-6 max-w-md">
+                    <svg
+                      className="w-16 h-16 mx-auto text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+                      />
+                    </svg>
+                    <h2 className="text-2xl font-semibold">Welcome to Open Browser</h2>
+                    <p className="text-muted-foreground">
+                      Enter a URL or search query in the address bar to get started.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Click the AI button to chat with local models about any page.
+                    </p>
+
+                    {/* Personality Selection Button */}
+                    <div className="pt-4">
+                      <button
+                        onClick={() => setIsPersonalitySelectorOpen(true)}
+                        className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-lg"
+                      >
+                        Choose AI Personality
+                      </button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Customize how your AI assistant talks to you
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WebView - only render if not suspended and has URL */}
+              {shouldRenderWebview && tab.url && (
+                <webview
+                  ref={(el) => {
+                    if (el) {
+                      webviewRefs.current[tab.id] = el;
+                      // Setup listeners on mount
+                      const cleanup = setupWebviewListeners(el, tab.id);
+                      // Store cleanup function
+                      (el as any).__cleanup = cleanup;
+                    } else if (webviewRefs.current[tab.id]) {
+                      // Cleanup on unmount
+                      const cleanup = (webviewRefs.current[tab.id] as any).__cleanup;
+                      if (cleanup) cleanup();
+                      delete webviewRefs.current[tab.id];
+                    }
+                  }}
+                  src={tab.url}
+                  className="w-full h-full"
+                  // @ts-ignore - webview is a custom Electron element
+                  // Security: Use persistent partition for session data
+                  partition="persist:main"
+                  // Security: Disable popups to prevent popup spam and phishing
+                  allowpopups="false"
+                  // Security: Enable context isolation, allow javascript and plugins for full browsing
+                  // Note: Webviews are sandboxed separately from the main renderer process
+                  webpreferences="contextIsolation=true,javascript=yes,plugins=yes,sandbox=true"
+                  // User agent string for compatibility
+                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Personality Selector Modal */}

@@ -325,9 +325,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
               });
             } else {
               // Add tool result message
-              const resultContent = result.result !== null && result.result !== undefined
-                ? JSON.stringify(result.result, null, 2)
-                : 'Tool executed successfully but returned no data';
+              const resultContent =
+                result.result !== null && result.result !== undefined
+                  ? JSON.stringify(result.result, null, 2)
+                  : 'Tool executed successfully but returned no data';
 
               state.addMessage({
                 role: 'tool',
