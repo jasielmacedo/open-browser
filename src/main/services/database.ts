@@ -141,6 +141,34 @@ class DatabaseService {
 
       CREATE INDEX IF NOT EXISTS idx_tabs_position ON tabs(position);
     `);
+
+    // Settings table for app preferences (window state, etc.)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+
+    // Initialize default system prompt if not exists
+    const systemPrompt = this.getSetting('system-prompt');
+    if (!systemPrompt) {
+      this.setSetting(
+        'system-prompt',
+        'You are a helpful AI assistant integrated into a web browser. Provide clear, concise, and accurate responses.'
+      );
+    }
+
+    const userInfo = this.getSetting('user-info');
+    if (!userInfo) {
+      this.setSetting('user-info', '');
+    }
+
+    const customInstructions = this.getSetting('custom-instructions');
+    if (!customInstructions) {
+      this.setSetting('custom-instructions', '');
+    }
   }
 
   // History operations
@@ -475,6 +503,33 @@ class DatabaseService {
       history: this.getHistory(limit),
       bookmarks: this.getBookmarks(limit),
     };
+  }
+
+  // Settings operations
+  getSetting(key: string): string | null {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined;
+
+    return row ? row.value : null;
+  }
+
+  setSetting(key: string, value: string): void {
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db
+      .prepare(
+        `
+      INSERT INTO settings (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `
+      )
+      .run(key, value, Date.now());
   }
 
   close() {

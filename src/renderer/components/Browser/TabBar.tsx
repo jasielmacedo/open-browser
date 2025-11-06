@@ -20,7 +20,7 @@ export const TabBar: React.FC = () => {
   return (
     <div className="flex items-center bg-card border-b border-border overflow-x-auto">
       {/* Tabs */}
-      <div className="flex flex-1 items-center overflow-x-auto scrollbar-hide">
+      <div className="flex items-center overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <div
             key={tab.id}
@@ -68,21 +68,23 @@ export const TabBar: React.FC = () => {
               {tab.title || tab.url || 'New Tab'}
             </span>
 
-            {/* Close button */}
-            <button
-              onClick={(e) => handleCloseTab(tab.id, e)}
-              className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-              title="Close tab"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            {/* Close button - only show if there's more than one tab */}
+            {tabs.length > 1 && (
+              <button
+                onClick={(e) => handleCloseTab(tab.id, e)}
+                className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                title="Close tab"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         ))}
       </div>

@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useModelStore } from '../../store/models';
+import { useDownloadStore } from '../../store/downloads';
 import { getAvailableModels, getCapabilityBadges } from '../../../shared/modelRegistry';
 import type { ModelMetadata, PullProgress } from '../../../shared/types';
 
 export const AvailableModels: React.FC = () => {
-  const {
-    models,
-    pullProgress,
-    isPulling,
-    setIsPulling,
-    setPullProgress,
-    clearPullProgress,
-    refreshModels,
-    setError,
-  } = useModelStore();
+  const { models, refreshModels, setError } = useModelStore();
+  const { downloads, addDownload, updateDownload } = useDownloadStore();
   const [availableModels, setAvailableModels] = useState<ModelMetadata[]>([]);
   const [filter, setFilter] = useState<'all' | 'vision' | 'text'>('all');
 
@@ -23,18 +16,17 @@ export const AvailableModels: React.FC = () => {
   }, [models]);
 
   const handlePull = async (modelName: string) => {
-    setIsPulling(true);
+    // Add download to the global download manager
+    addDownload(modelName);
 
     // Set up progress listener
     const unsubscribe = window.electron.on('ollama:pullProgress', (progress: PullProgress) => {
-      setPullProgress(modelName, progress);
+      updateDownload(modelName, progress);
 
-      // If pull completed, refresh models and clear progress
+      // If pull completed, refresh models
       if (progress.status === 'success' || progress.status === 'complete') {
         setTimeout(async () => {
           await refreshModels();
-          clearPullProgress(modelName);
-          setIsPulling(false);
         }, 1000);
       }
     });
@@ -45,8 +37,10 @@ export const AvailableModels: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to pull model:', error);
       setError(error.message || 'Failed to download model');
-      clearPullProgress(modelName);
-      setIsPulling(false);
+      updateDownload(modelName, {
+        status: 'error',
+        error: error.message || 'Failed to download model',
+      });
     } finally {
       // Cleanup listener after a delay to catch final events
       setTimeout(() => {
@@ -118,8 +112,7 @@ export const AvailableModels: React.FC = () => {
                   key={model.id}
                   model={model}
                   onPull={handlePull}
-                  isPulling={isPulling}
-                  progress={pullProgress.get(model.name)}
+                  download={downloads.get(model.name)}
                 />
               ))}
             </div>
@@ -138,8 +131,7 @@ export const AvailableModels: React.FC = () => {
                   key={model.id}
                   model={model}
                   onPull={handlePull}
-                  isPulling={isPulling}
-                  progress={pullProgress.get(model.name)}
+                  download={downloads.get(model.name)}
                 />
               ))}
             </div>
@@ -159,15 +151,16 @@ export const AvailableModels: React.FC = () => {
 interface ModelCardProps {
   model: ModelMetadata;
   onPull: (modelName: string) => void;
-  isPulling: boolean;
-  progress?: PullProgress;
+  download?: ReturnType<typeof useDownloadStore>['downloads'] extends Map<string, infer T>
+    ? T
+    : never;
 }
 
-const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progress }) => {
+const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, download }) => {
   const badges = getCapabilityBadges(model);
-  const isDownloading = progress && progress.status !== 'success';
-  const progressPercent =
-    progress && progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+  const isDownloading =
+    download && download.overallStatus !== 'success' && download.overallStatus !== 'complete';
+  const progressPercent = download?.overallProgress || 0;
 
   return (
     <div className="p-4 rounded-lg border border-border bg-card hover:border-border/80 transition-all">
@@ -178,7 +171,12 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progres
         </div>
         {model.capabilities.vision && (
           <div className="flex-shrink-0" title="Supports vision">
-            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-5 h-5 text-primary"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -227,7 +225,7 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progres
       {isDownloading ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{progress.status}</span>
+            <span>{download?.overallStatus}</span>
             <span>{progressPercent}%</span>
           </div>
           <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
@@ -236,11 +234,16 @@ const ModelCard: React.FC<ModelCardProps> = ({ model, onPull, isPulling, progres
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+          {download && download.layers.size > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {download.layers.size} layer{download.layers.size > 1 ? 's' : ''} downloading
+            </div>
+          )}
         </div>
       ) : (
         <button
           onClick={() => onPull(model.name)}
-          disabled={isPulling}
+          disabled={isDownloading}
           className="w-full px-4 py-2 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -53,6 +53,7 @@ export interface ModelCapabilities {
   chat: boolean;
   completion: boolean;
   embedding?: boolean;
+  toolCalling?: boolean; // Function calling / tool use capability
 }
 
 export interface ModelMetadata {
@@ -90,7 +91,7 @@ export interface PullProgress {
 }
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   images?: string[];
   timestamp?: number;

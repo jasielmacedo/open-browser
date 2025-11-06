@@ -16,11 +16,64 @@ console.log('===== SETUP COMPLETED =====');
 
 let mainWindow: BrowserWindow | null = null;
 
+// Window state persistence
+interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+  isMaximized: boolean;
+}
+
+let windowState: WindowState = {
+  width: 1200,
+  height: 800,
+  isMaximized: false,
+};
+
+// Load window state from database
+const loadWindowState = (): WindowState => {
+  try {
+    const stateJson = databaseService.getSetting('window-state');
+    if (stateJson) {
+      return JSON.parse(stateJson);
+    }
+  } catch (error) {
+    console.error('Failed to load window state:', error);
+  }
+  return windowState;
+};
+
+// Save window state to database
+const saveWindowState = () => {
+  try {
+    if (!mainWindow) return;
+
+    const bounds = mainWindow.getBounds();
+    windowState = {
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      isMaximized: mainWindow.isMaximized(),
+    };
+
+    databaseService.setSetting('window-state', JSON.stringify(windowState));
+  } catch (error) {
+    console.error('Failed to save window state:', error);
+  }
+};
+
 const createWindow = () => {
+  // Load previous window state
+  windowState = loadWindowState();
+
   // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: windowState.width,
+    height: windowState.height,
+    x: windowState.x,
+    y: windowState.y,
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
@@ -67,7 +120,32 @@ const createWindow = () => {
 
   // Show window when ready to prevent flicker
   mainWindow.once('ready-to-show', () => {
+    // Restore maximized state
+    if (windowState.isMaximized) {
+      mainWindow?.maximize();
+    }
     mainWindow?.show();
+  });
+
+  // Save window state on resize/move
+  mainWindow.on('resize', () => {
+    if (!mainWindow?.isMaximized()) {
+      saveWindowState();
+    }
+  });
+
+  mainWindow.on('move', () => {
+    if (!mainWindow?.isMaximized()) {
+      saveWindowState();
+    }
+  });
+
+  mainWindow.on('maximize', saveWindowState);
+  mainWindow.on('unmaximize', saveWindowState);
+
+  // Save state before closing
+  mainWindow.on('close', () => {
+    saveWindowState();
   });
 
   // Emitted when the window is closed
@@ -81,6 +159,9 @@ app.whenReady().then(async () => {
   // Initialize database
   databaseService.initialize();
 
+  // Set flag to indicate app is running - used for crash detection
+  databaseService.setSetting('app-running', 'true');
+
   // Register IPC handlers
   console.log('Registering IPC handlers...');
   try {
@@ -88,6 +169,15 @@ app.whenReady().then(async () => {
     console.log('IPC handlers registered successfully');
   } catch (error) {
     console.error('Failed to register IPC handlers:', error);
+  }
+
+  // Clean up any orphan Ollama processes from previous sessions
+  console.log('Cleaning up orphan Ollama processes...');
+  try {
+    await ollamaService.killOrphanProcesses();
+    console.log('Orphan process cleanup complete');
+  } catch (error) {
+    console.error('Failed to clean up orphan processes:', error);
   }
 
   // Auto-start Ollama service
@@ -165,10 +255,61 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Cleanup on app quit
-app.on('before-quit', () => {
+// Track if cleanup has been performed
+let cleanupPerformed = false;
+
+// Perform cleanup
+async function performCleanup(): Promise<void> {
+  if (cleanupPerformed) {
+    console.log('[Main] Cleanup already performed, skipping...');
+    return;
+  }
+
+  cleanupPerformed = true;
+  console.log('[Main] Performing cleanup...');
+
+  try {
+    // Stop Ollama service first
+    await ollamaService.stop();
+    console.log('[Main] Ollama service stopped');
+  } catch (error) {
+    console.error('[Main] Error stopping Ollama service:', error);
+  }
+
+  // Clear tabs on clean exit (not on crash)
+  databaseService.clearTabs();
+  // Mark app as cleanly closed
+  databaseService.setSetting('app-running', 'false');
   databaseService.close();
-  ollamaService.stop();
+
+  console.log('[Main] Cleanup complete');
+}
+
+// Cleanup on app quit (primary handler)
+app.on('before-quit', async (e) => {
+  if (!cleanupPerformed) {
+    // Prevent default quit to allow async cleanup
+    e.preventDefault();
+
+    console.log('[Main] App quitting (before-quit)...');
+    await performCleanup();
+
+    // Now actually quit the app
+    app.exit(0);
+  }
+});
+
+// Backup cleanup handler in case before-quit doesn't fire
+app.on('will-quit', async (e) => {
+  if (!cleanupPerformed) {
+    e.preventDefault();
+
+    console.log('[Main] App quitting (will-quit)...');
+    await performCleanup();
+
+    // Now actually quit the app
+    app.exit(0);
+  }
 });
 
 // Security: Configure web contents behavior
@@ -285,6 +426,47 @@ app.on('web-contents-created', (event, contents) => {
 
       // Separator if we added edit items
       if (params.editFlags.canCut || params.editFlags.canCopy || params.editFlags.canPaste) {
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // AI features for selected text
+      if (params.selectionText && params.selectionText.trim().length > 0) {
+        menu.append(
+          new MenuItem({
+            label: 'Ask AI about this',
+            click: () => {
+              mainWindow?.webContents.send('ai-ask-about-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Explain this',
+            click: () => {
+              mainWindow?.webContents.send('ai-explain-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Translate this',
+            click: () => {
+              mainWindow?.webContents.send('ai-translate-selection', params.selectionText);
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Summarize this',
+            click: () => {
+              mainWindow?.webContents.send('ai-summarize-selection', params.selectionText);
+            },
+          })
+        );
+
         menu.append(new MenuItem({ type: 'separator' }));
       }
 

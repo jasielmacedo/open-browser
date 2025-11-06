@@ -35,7 +35,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ items, position, onClo
     setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleEscape);
-    }, 0);
+    }, 100);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);

@@ -72,6 +72,14 @@ export function supportsVision(modelName: string): boolean {
 }
 
 /**
+ * Check if a model supports tool calling / function calling
+ */
+export function supportsToolCalling(modelName: string): boolean {
+  const metadata = findModelMetadata(modelName);
+  return metadata?.capabilities.toolCalling ?? false;
+}
+
+/**
  * Enrich installed models with metadata from registry
  */
 export function enrichInstalledModels(installedModels: OllamaModel[]): InstalledModelInfo[] {
@@ -123,6 +131,7 @@ export function getCapabilityBadges(metadata?: ModelMetadata): string[] {
   if (metadata.capabilities.chat) badges.push('Chat');
   if (metadata.capabilities.completion) badges.push('Completion');
   if (metadata.capabilities.embedding) badges.push('Embeddings');
+  if (metadata.capabilities.toolCalling) badges.push('Tool Calling');
 
   return badges;
 }

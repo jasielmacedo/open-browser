@@ -64,7 +64,8 @@ export const InstalledModels: React.FC = () => {
           <div>
             <h3 className="font-semibold text-lg mb-1">No Models Installed</h3>
             <p className="text-sm text-muted-foreground">
-              Download models from the &quot;Available Models&quot; tab to get started with AI features.
+              Download models from the &quot;Available Models&quot; tab to get started with AI
+              features.
             </p>
           </div>
         </div>
@@ -114,7 +115,12 @@ export const InstalledModels: React.FC = () => {
                   {/* Metadata */}
                   <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mb-3">
                     <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -127,7 +133,12 @@ export const InstalledModels: React.FC = () => {
 
                     {model.metadata?.parameters && (
                       <div className="flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -140,7 +151,12 @@ export const InstalledModels: React.FC = () => {
                     )}
 
                     <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"

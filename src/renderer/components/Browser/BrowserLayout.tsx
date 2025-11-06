@@ -6,6 +6,7 @@ import { ChatSidebar } from '../Chat/ChatSidebar';
 import { HistorySidebar } from './HistorySidebar';
 import { BookmarksSidebar } from './BookmarksSidebar';
 import { ModelManager } from '../Models/ModelManager';
+import { DownloadStatusBar } from '../Downloads/DownloadStatusBar';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
@@ -180,6 +181,9 @@ export const BrowserLayout: React.FC = () => {
 
       {/* Modal Overlays */}
       <ModelManager />
+
+      {/* Download Status Bar */}
+      <DownloadStatusBar />
     </div>
   );
 };
