@@ -18,6 +18,7 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 
 ### Currently Available
 
+#### Core Browser Features
 - 🌐 Full-featured Chromium browser with multi-tab support
 - 📑 Tab management with keyboard shortcuts (Ctrl+T, Ctrl+W, Ctrl+Tab)
 - 🔍 Navigation controls (back, forward, reload, home)
@@ -25,24 +26,67 @@ A Chromium-based browser with integrated local LLM capabilities for intelligent 
 - ⭐ Bookmarks management system
 - 🎯 Context menus with right-click support
 - ⚙️ Tab suspension for better memory management
-- 🔐 Comprehensive security hardening
+- 🔐 Comprehensive security hardening with context isolation
 - 🛠️ Developer tools integration (F12)
 - 📄 Page printing and source viewing
 - 🔎 Zoom controls (Ctrl +/-/0)
+- 💾 Tab persistence and crash recovery
+
+#### AI & LLM Features
 - 🤖 Ollama/LLM integration with streaming inference
 - 💬 Chat sidebar for AI conversations with model capability detection
 - ⚡ Comprehensive model manager with download progress tracking
 - 🎯 Vision-capable and text-only model support
 - 🚀 Automatic GPU acceleration (CUDA, ROCm, Metal)
 - ⭐ Default model selection and persistent settings
+- 🎭 **AI Personality Selection** - 26 unique personalities across 4 categories:
+  - Professional (Business Analyst, Technical Expert, Life Coach, etc.)
+  - Friends (Best Friend, Study Buddy, Workout Partner, etc.)
+  - Funny (Stand-up Comedian, Sarcastic Friend, Meme Lord, etc.)
+  - Romantic (Various caring, adventurous, and supportive partners)
+- 🧠 **Context-Aware AI** - Smart context optimization with:
+  - Page content capture and analysis
+  - Browsing history context injection
+  - Bookmarks context injection
+  - Token estimation and optimization
+- 📸 **Vision Model Integration** - Screenshot capture for vision-capable models
+- 🛠️ **Tool Calling/Agent Mode** - AI can interact with browser through 6 tools:
+  - Search history
+  - Access bookmarks
+  - Analyze page content
+  - Capture screenshots
+  - Get page metadata
+  - Perform web searches
+- 🤔 **Advanced Reasoning** - Chain-of-thought support with thinking token streaming
+- 💭 **Custom System Prompts** - Personalize AI behavior with custom instructions
+
+#### Download Management
+- 📥 **Comprehensive Download Manager** with:
+  - Real-time download progress tracking
+  - Pause/resume/cancel functionality
+  - Download history with categorization (active, completed, failed)
+  - File type information and metadata
+  - Download speed and time estimation
+  - Open files and show in folder
+  - Automatic cleanup of old downloads
+
+#### Privacy & Security
+- 🔒 **Mandatory User Agreement** - One-time comprehensive disclosure covering:
+  - Local data storage (no cloud transmission)
+  - Model behavior and content disclaimers
+  - AI model context access
+  - Zero telemetry or data collection
+- 🛡️ **Privacy-First Design** - All data stored locally, no external transmission
+- 🔐 Advanced security hardening with sandboxing and validation
 
 ### Planned Features
 
-- 🖼️ Vision model integration for screenshot analysis
-- 📊 AI-powered page summarization and content extraction
-- 📥 Model management UI with progress tracking
 - 🏷️ Smart bookmarking with AI categorization
 - 🔍 Semantic search across browsing history
+- 📊 Enhanced page summarization with readability optimization
+- 🌐 Multi-language support for UI
+- 📱 Mobile companion app
+- 🔄 Sync across devices (optional, privacy-preserving)
 
 ## Tech Stack
 
@@ -141,21 +185,25 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 
 ## Current Status
 
-🚀 **Active Development** - Core browser features implemented, AI integration in progress
+🚀 **Active Development** - Full-featured browser with comprehensive AI integration, including personality selection, vision models, tool calling, and advanced download management
 
 ### Completed
 
+#### Core Infrastructure
 - [x] Electron + React + TypeScript setup
 - [x] Vite build configuration with HMR
 - [x] Security hardening implementation
 - [x] Browser UI with navigation and multi-tab support
 - [x] Tab management (create, close, switch, suspend)
+- [x] Tab persistence and crash recovery
 - [x] History tracking and searchable sidebar
 - [x] Bookmarks management system
 - [x] SQLite database integration
 - [x] Context menus and keyboard shortcuts
 - [x] Code quality tooling (ESLint, Prettier, Husky)
 - [x] CI/CD with GitHub Actions
+
+#### AI & LLM Integration
 - [x] Ollama service integration with auto-start capability
 - [x] Chat interface with streaming message support
 - [x] Comprehensive model manager UI with tabs
@@ -168,13 +216,24 @@ See [TECH_BRIEFING.md](./TECH_BRIEFING.md) for comprehensive technical documenta
 - [x] IPC handlers for secure LLM operations
 - [x] Chat and Model state management with Zustand
 
+#### New Advanced Features
+- [x] **AI Personality Selection** - 26 personalities across 4 categories
+- [x] **Context-Aware AI** - Smart context optimization with page analysis
+- [x] **Vision Model Integration** - Screenshot capture and analysis
+- [x] **Tool Calling/Agent Mode** - 6 browser interaction tools
+- [x] **Advanced Reasoning** - Chain-of-thought with thinking tokens
+- [x] **Custom System Prompts** - User-defined AI behavior
+- [x] **Comprehensive Download Manager** - Full download lifecycle management
+- [x] **Mandatory User Agreement** - One-time privacy and terms disclosure
+- [x] **Content Capture Service** - Page text and DOM extraction
+- [x] **Page Context Extraction** - Smart content summarization
+
 ### In Progress / Planned
 
-- [ ] Vision model integration for screenshot and page analysis
-- [ ] Content capture service for page context extraction
-- [ ] AI-powered page summarization with readability
 - [ ] Smart bookmarking with AI categorization
-- [ ] Model registry with pre-configured models
+- [ ] Semantic search across browsing history
+- [ ] Enhanced page summarization with readability optimization
+- [ ] Multi-language support for UI
 
 ## Keyboard Shortcuts
 
