@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, exec } from 'child_process';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -77,6 +77,7 @@ export class OllamaService {
   private process: ChildProcess | null = null;
   private isServerRunning = false;
   private activePulls: Map<string, boolean> = new Map();
+  private activeRequest: http.ClientRequest | null = null;
 
   constructor(baseURL = 'http://localhost:11434') {
     this.baseURL = baseURL;
@@ -292,6 +293,24 @@ export class OllamaService {
           env.PATH = `${libPath};${env.PATH}`;
         }
 
+        // Enable GPU acceleration if available
+        // Ollama will automatically detect and use CUDA (NVIDIA) or ROCm (AMD) if installed
+        // These environment variables ensure optimal GPU usage
+        env.OLLAMA_NUM_PARALLEL = '1'; // Number of parallel requests (1 for better single-request performance)
+        env.OLLAMA_MAX_LOADED_MODELS = '1'; // Keep only 1 model in memory for better performance
+
+        // For NVIDIA GPUs, ensure all layers are offloaded to GPU
+        // Set to 0 to let Ollama auto-detect optimal layer count, or set a high number like 999
+        if (!env.OLLAMA_NUM_GPU) {
+          env.OLLAMA_NUM_GPU = '999'; // Offload all layers to GPU if available
+        }
+
+        console.log('Ollama environment:', {
+          numGpu: env.OLLAMA_NUM_GPU,
+          numParallel: env.OLLAMA_NUM_PARALLEL,
+          maxLoaded: env.OLLAMA_MAX_LOADED_MODELS,
+        });
+
         // Spawn ollama serve process with bundled executable
         this.process = spawn(ollamaPath, ['serve'], {
           stdio: 'pipe',
@@ -305,11 +324,22 @@ export class OllamaService {
         });
 
         // Wait for server to be ready
+        let isChecking = false;
         const checkInterval = setInterval(async () => {
-          if (await this.isRunning()) {
-            clearInterval(checkInterval);
-            console.log('Ollama server started successfully');
-            resolve();
+          // Skip if a check is already in progress
+          if (isChecking) {
+            return;
+          }
+
+          isChecking = true;
+          try {
+            if (await this.isRunning()) {
+              clearInterval(checkInterval);
+              console.log('Ollama server started successfully');
+              resolve();
+            }
+          } finally {
+            isChecking = false;
           }
         }, 500);
 
@@ -334,14 +364,180 @@ export class OllamaService {
   }
 
   /**
-   * Stop Ollama server process
+   * Kill any orphan Ollama processes left from previous sessions
    */
-  stop(): void {
-    if (this.process) {
-      this.process.kill();
-      this.process = null;
-      this.isServerRunning = false;
+  async killOrphanProcesses(): Promise<void> {
+    console.log('[Ollama] Checking for orphan Ollama processes...');
+
+    if (process.platform === 'win32') {
+      // On Windows, find and kill all ollama.exe processes
+      return new Promise<void>((resolve) => {
+        exec('tasklist /FI "IMAGENAME eq ollama.exe" /FO CSV /NH', (error, stdout) => {
+          if (error || !stdout || stdout.includes('INFO: No tasks are running')) {
+            console.log('[Ollama] No orphan processes found');
+            resolve();
+            return;
+          }
+
+          // Parse the output to get PIDs
+          const lines = stdout.trim().split('\n');
+          const pids: number[] = [];
+
+          for (const line of lines) {
+            const match = line.match(/"ollama\.exe","(\d+)"/);
+            if (match && match[1]) {
+              pids.push(parseInt(match[1], 10));
+            }
+          }
+
+          if (pids.length === 0) {
+            console.log('[Ollama] No orphan processes found');
+            resolve();
+            return;
+          }
+
+          console.log(`[Ollama] Found ${pids.length} orphan Ollama process(es), terminating...`);
+
+          // Kill all found processes
+          const killPromises = pids.map((pid) => {
+            return new Promise<void>((resolveKill) => {
+              exec(`taskkill /F /PID ${pid} /T`, (killError) => {
+                if (killError) {
+                  console.error(`[Ollama] Failed to kill process ${pid}:`, killError);
+                } else {
+                  console.log(`[Ollama] Killed orphan process ${pid}`);
+                }
+                resolveKill();
+              });
+            });
+          });
+
+          Promise.all(killPromises).then(() => {
+            console.log('[Ollama] All orphan processes terminated');
+            resolve();
+          });
+        });
+      });
+    } else if (process.platform === 'darwin') {
+      // On macOS, find and kill Ollama processes
+      return new Promise<void>((resolve) => {
+        exec('pgrep -f "ollama"', (error, stdout) => {
+          if (error || !stdout.trim()) {
+            console.log('[Ollama] No orphan processes found');
+            resolve();
+            return;
+          }
+
+          const pids = stdout
+            .trim()
+            .split('\n')
+            .map((pid) => parseInt(pid, 10))
+            .filter((pid) => !isNaN(pid));
+
+          if (pids.length === 0) {
+            console.log('[Ollama] No orphan processes found');
+            resolve();
+            return;
+          }
+
+          console.log(`[Ollama] Found ${pids.length} orphan Ollama process(es), terminating...`);
+
+          // Kill all found processes
+          const killPromises = pids.map((pid) => {
+            return new Promise<void>((resolveKill) => {
+              exec(`kill -9 ${pid}`, (killError) => {
+                if (killError) {
+                  console.error(`[Ollama] Failed to kill process ${pid}:`, killError);
+                } else {
+                  console.log(`[Ollama] Killed orphan process ${pid}`);
+                }
+                resolveKill();
+              });
+            });
+          });
+
+          Promise.all(killPromises).then(() => {
+            console.log('[Ollama] All orphan processes terminated');
+            resolve();
+          });
+        });
+      });
+    } else {
+      console.log('[Ollama] Orphan process cleanup not implemented for this platform');
+      return Promise.resolve();
     }
+  }
+
+  /**
+   * Stop Ollama server process with force
+   */
+  async stop(): Promise<void> {
+    if (!this.process) {
+      console.log('[Ollama] No process to stop');
+      return;
+    }
+
+    const pid = this.process.pid;
+    console.log(`[Ollama] Stopping Ollama process (PID: ${pid})`);
+
+    return new Promise<void>((resolve) => {
+      if (!this.process) {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.warn('[Ollama] Process did not exit gracefully, forcing termination');
+
+        // Force kill the process using platform-specific commands
+        if (process.platform === 'win32' && pid) {
+          // Use taskkill on Windows with /F flag for forceful termination
+          exec(`taskkill /F /PID ${pid} /T`, (error) => {
+            if (error) {
+              console.error('[Ollama] Failed to force kill process:', error);
+            }
+            this.process = null;
+            this.isServerRunning = false;
+            resolve();
+          });
+        } else if (pid) {
+          // Use SIGKILL on Unix-like systems
+          try {
+            process.kill(pid, 'SIGKILL');
+          } catch (err) {
+            console.error('[Ollama] Failed to send SIGKILL:', err);
+          }
+          this.process = null;
+          this.isServerRunning = false;
+          resolve();
+        }
+      }, 3000); // Wait 3 seconds for graceful shutdown
+
+      this.process.once('exit', (code, signal) => {
+        clearTimeout(timeout);
+        console.log(`[Ollama] Process exited with code ${code} and signal ${signal}`);
+        this.process = null;
+        this.isServerRunning = false;
+        resolve();
+      });
+
+      // Try graceful shutdown first
+      try {
+        if (process.platform === 'win32') {
+          // On Windows, send SIGTERM (which is translated to a termination request)
+          this.process.kill('SIGTERM');
+        } else {
+          // On Unix, send SIGTERM for graceful shutdown
+          this.process.kill('SIGTERM');
+        }
+      } catch (err) {
+        console.error('[Ollama] Failed to send termination signal:', err);
+        clearTimeout(timeout);
+        this.process = null;
+        this.isServerRunning = false;
+        resolve();
+      }
+    });
   }
 
   /**
@@ -524,6 +720,17 @@ export class OllamaService {
   }
 
   /**
+   * Cancel the active chat request
+   */
+  cancelChat(): void {
+    if (this.activeRequest) {
+      console.log('[Ollama] Canceling active chat request');
+      this.activeRequest.destroy();
+      this.activeRequest = null;
+    }
+  }
+
+  /**
    * Delete a model
    */
   async deleteModel(modelName: string): Promise<void> {
@@ -658,6 +865,8 @@ export class OllamaService {
             'Content-Type': 'application/json',
             'Content-Length': Buffer.byteLength(data),
             Connection: 'keep-alive', // Keep connection alive for streaming
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no', // Disable nginx buffering
           },
           timeout: requestTimeout,
         };
@@ -670,6 +879,7 @@ export class OllamaService {
             let errorBody = '';
             res.on('data', (chunk) => (errorBody += chunk));
             res.on('end', () => {
+              this.activeRequest = null;
               reject(new Error(`HTTP ${res.statusCode}: ${errorBody}`));
             });
             return;
@@ -680,51 +890,176 @@ export class OllamaService {
 
         req.on('error', (error) => {
           console.error('[Ollama] Request error:', error);
+          this.activeRequest = null;
           reject(error);
         });
 
         req.on('timeout', () => {
           console.error('[Ollama] Request timeout');
           req.destroy();
+          this.activeRequest = null;
           reject(new Error('Request timeout'));
         });
+
+        // Store the request so it can be canceled
+        this.activeRequest = req;
 
         req.write(data);
         req.end();
       });
 
+      // Determine parsing strategy based on model
+      const modelName = request.model.toLowerCase();
+      const useAggressiveParsing = modelName.includes('qwen');
+
       let buffer = '';
+      let chunkCount = 0;
+      let tokenCount = 0;
+
+      console.log(
+        `[Ollama] Using ${useAggressiveParsing ? 'aggressive' : 'standard'} parsing for model: ${request.model}`
+      );
 
       for await (const chunk of stream) {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        chunkCount++;
+        const chunkStr = chunk.toString();
 
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const data = JSON.parse(line);
+        buffer += chunkStr;
 
-              // Check for tool calls
-              if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-                yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+        // Aggressive parsing for models that concatenate JSON without newlines (e.g., Qwen)
+        if (useAggressiveParsing) {
+          let processedSomething = true;
+          while (processedSomething && buffer.length > 0) {
+            processedSomething = false;
+
+            // Try to find concatenated JSON objects (}{)
+            if (buffer.includes('}{')) {
+              const parts = buffer.split(/(?<=\})(?=\{)/);
+              if (parts.length > 1) {
+                buffer = parts.pop() || '';
+
+                for (const part of parts) {
+                  if (part.trim()) {
+                    try {
+                      const data = JSON.parse(part);
+                      processedSomething = true;
+
+                      if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                        yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                      }
+
+                      if (data.message?.content) {
+                        tokenCount++;
+                        yield data.message.content;
+                      }
+
+                      if (data.done) {
+                        console.log(
+                          `[Ollama] Stream completed. Chunks: ${chunkCount}, Tokens: ${tokenCount}`
+                        );
+                        this.activeRequest = null;
+                        return;
+                      }
+                    } catch (_e) {
+                      // Invalid JSON, skip
+                    }
+                  }
+                }
               }
+            }
 
-              if (data.message?.content) {
-                yield data.message.content;
-              }
+            // Also try line-based for Qwen (in case format changes)
+            if (buffer.includes('\n')) {
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
 
-              if (data.done) {
-                return;
+              for (const line of lines) {
+                if (line.trim()) {
+                  try {
+                    const data = JSON.parse(line);
+                    processedSomething = true;
+
+                    if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                      yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                    }
+
+                    if (data.message?.content) {
+                      tokenCount++;
+                      yield data.message.content;
+                    }
+
+                    if (data.done) {
+                      console.log(
+                        `[Ollama] Stream completed. Chunks: ${chunkCount}, Tokens: ${tokenCount}`
+                      );
+                      this.activeRequest = null;
+                      return;
+                    }
+                  } catch (_e) {
+                    // Invalid JSON, skip
+                  }
+                }
               }
-            } catch (_e) {
-              console.warn('Failed to parse chat response line:', line);
+            }
+          }
+        } else {
+          // Standard line-based parsing for most models (LLaMA, Mistral, etc.)
+          if (buffer.includes('\n')) {
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.trim()) {
+                try {
+                  const data = JSON.parse(line);
+
+                  if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                    yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                  }
+
+                  if (data.message?.content) {
+                    tokenCount++;
+                    yield data.message.content;
+                  }
+
+                  if (data.done) {
+                    console.log(
+                      `[Ollama] Stream completed. Chunks: ${chunkCount}, Tokens: ${tokenCount}`
+                    );
+                    this.activeRequest = null;
+                    return;
+                  }
+                } catch (_e) {
+                  console.warn('[Ollama] Failed to parse line:', line.substring(0, 50));
+                }
+              }
             }
           }
         }
       }
+
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const data = JSON.parse(buffer);
+          if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+            yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+          }
+          if (data.message?.content) {
+            tokenCount++;
+            yield data.message.content;
+          }
+          if (data.done) {
+            console.log(`[Ollama] Stream completed. Chunks: ${chunkCount}, Tokens: ${tokenCount}`);
+            this.activeRequest = null;
+          }
+        } catch (_e) {
+          // Ignore parse errors for final buffer
+        }
+      }
     } catch (error) {
       console.error('Failed to chat:', error);
+      this.activeRequest = null;
       throw new Error('Failed to chat with Ollama');
     }
   }

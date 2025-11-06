@@ -1,4 +1,5 @@
-import { ipcMain, BrowserWindow, webContents } from 'electron';
+import { ipcMain, BrowserWindow, webContents, dialog, shell } from 'electron';
+import path from 'path';
 import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
 import {
   validateUrl,
@@ -744,6 +745,80 @@ export function registerIpcHandlers() {
       return databaseService.setSetting(key, value);
     } catch (error: any) {
       console.error('settings:set error:', error.message);
+      throw error;
+    }
+  });
+
+  // Models folder handlers
+  ipcMain.handle('models:getFolder', async () => {
+    try {
+      const ollamaHome =
+        process.env.OLLAMA_MODELS ||
+        (process.platform === 'win32'
+          ? path.join(process.env.USERPROFILE || '', '.ollama', 'models')
+          : path.join(process.env.HOME || '', '.ollama', 'models'));
+      return ollamaHome;
+    } catch (error: any) {
+      console.error('models:getFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('models:selectFolder', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select Models Folder',
+        buttonLabel: 'Select Folder',
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      return result.filePaths[0];
+    } catch (error: any) {
+      console.error('models:selectFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('models:openFolder', async (_event, folderPath?: string) => {
+    try {
+      const targetPath =
+        folderPath ||
+        process.env.OLLAMA_MODELS ||
+        (process.platform === 'win32'
+          ? path.join(process.env.USERPROFILE || '', '.ollama', 'models')
+          : path.join(process.env.HOME || '', '.ollama', 'models'));
+
+      await shell.openPath(targetPath);
+      return { success: true };
+    } catch (error: any) {
+      console.error('models:openFolder error:', error.message);
+      throw error;
+    }
+  });
+
+  // Download control handlers
+  ipcMain.handle('ollama:cancelPull', async (_event, modelName: string) => {
+    try {
+      validateString(modelName, 'Model name', 256);
+      ollamaService.cancelPull(modelName);
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:cancelPull error:', error.message);
+      throw error;
+    }
+  });
+
+  // Chat control handlers
+  ipcMain.handle('ollama:cancelChat', async () => {
+    try {
+      ollamaService.cancelChat();
+      return { success: true };
+    } catch (error: any) {
+      console.error('ollama:cancelChat error:', error.message);
       throw error;
     }
   });

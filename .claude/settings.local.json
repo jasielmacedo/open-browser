@@ -22,8 +22,8 @@
       "Bash(chmod:*)",
       "Bash(npm run format:*)",
       "Bash(npx electron-rebuild:*)",
-      "Bash(taskkill:*)",
-      "WebFetch(domain:ollama.com)"
+      "WebFetch(domain:ollama.com)",
+      "Bash(npm run lint:fix:*)"
     ],
     "deny": [],
     "ask": []

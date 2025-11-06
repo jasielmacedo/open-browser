@@ -47,6 +47,7 @@ interface ChatState {
   setPlanningMode: (enabled: boolean) => void;
   clearMessages: () => void;
   startNewMessage: (role: 'user' | 'assistant') => string;
+  cancelGeneration: () => Promise<void>;
   sendChatMessage: (
     prompt: string,
     images?: string[],
@@ -117,6 +118,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ],
     }));
     return id;
+  },
+
+  cancelGeneration: async () => {
+    try {
+      await window.electron.invoke('ollama:cancelChat');
+      set({ isStreaming: false, streamingContent: '' });
+
+      // Add a message indicating the generation was stopped
+      const state = get();
+      state.addMessage({
+        role: 'assistant',
+        content: '⏹️ Generation stopped by user.',
+      });
+    } catch (error) {
+      console.error('Failed to cancel generation:', error);
+    }
   },
 
   sendChatMessage: async (prompt: string, images?: string[], pageContext?: any) => {

@@ -156,7 +156,7 @@
       "id": "qwen3-vl:8b",
       "name": "qwen3-vl:8b",
       "displayName": "Qwen3-VL 8B",
-      "description": "Alibaba's latest powerful vision-language model with 256K context. Excellent for GUI interaction, code generation from images, and OCR in 32 languages.",
+      "description": "Alibaba's latest powerful vision-language model with 256K context. Excellent for GUI interaction, code generation from images, and OCR in 32 languages. GPU highly recommended for faster inference.",
       "size": "6.1 GB",
       "parameters": "8B",
       "capabilities": {
@@ -168,7 +168,7 @@
       "recommended": true,
       "requiresGPU": false,
       "minRAM": "12 GB",
-      "tags": ["vision", "multimodal", "recommended", "ocr", "code-generation"],
+      "tags": ["vision", "multimodal", "recommended", "ocr", "code-generation", "gpu-optimized"],
       "family": "qwen",
       "homepage": "https://ollama.com/library/qwen3-vl"
     },

@@ -171,6 +171,15 @@ app.whenReady().then(async () => {
     console.error('Failed to register IPC handlers:', error);
   }
 
+  // Clean up any orphan Ollama processes from previous sessions
+  console.log('Cleaning up orphan Ollama processes...');
+  try {
+    await ollamaService.killOrphanProcesses();
+    console.log('Orphan process cleanup complete');
+  } catch (error) {
+    console.error('Failed to clean up orphan processes:', error);
+  }
+
   // Auto-start Ollama service
   console.log('Starting Ollama service...');
   try {
@@ -246,14 +255,61 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Cleanup on app quit
-app.on('before-quit', () => {
+// Track if cleanup has been performed
+let cleanupPerformed = false;
+
+// Perform cleanup
+async function performCleanup(): Promise<void> {
+  if (cleanupPerformed) {
+    console.log('[Main] Cleanup already performed, skipping...');
+    return;
+  }
+
+  cleanupPerformed = true;
+  console.log('[Main] Performing cleanup...');
+
+  try {
+    // Stop Ollama service first
+    await ollamaService.stop();
+    console.log('[Main] Ollama service stopped');
+  } catch (error) {
+    console.error('[Main] Error stopping Ollama service:', error);
+  }
+
   // Clear tabs on clean exit (not on crash)
   databaseService.clearTabs();
   // Mark app as cleanly closed
   databaseService.setSetting('app-running', 'false');
   databaseService.close();
-  ollamaService.stop();
+
+  console.log('[Main] Cleanup complete');
+}
+
+// Cleanup on app quit (primary handler)
+app.on('before-quit', async (e) => {
+  if (!cleanupPerformed) {
+    // Prevent default quit to allow async cleanup
+    e.preventDefault();
+
+    console.log('[Main] App quitting (before-quit)...');
+    await performCleanup();
+
+    // Now actually quit the app
+    app.exit(0);
+  }
+});
+
+// Backup cleanup handler in case before-quit doesn't fire
+app.on('will-quit', async (e) => {
+  if (!cleanupPerformed) {
+    e.preventDefault();
+
+    console.log('[Main] App quitting (will-quit)...');
+    await performCleanup();
+
+    // Now actually quit the app
+    app.exit(0);
+  }
 });
 
 // Security: Configure web contents behavior
