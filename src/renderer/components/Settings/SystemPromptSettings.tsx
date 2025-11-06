@@ -121,7 +121,8 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
                   {getIconEmoji(currentPersonality.icon)}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-medium">{currentPersonality.name}</h4>
+                  <h4 className="font-medium">{currentPersonality.personName}</h4>
+                  <p className="text-xs text-muted-foreground/80">{currentPersonality.name}</p>
                   <p className="text-sm text-muted-foreground mt-0.5">{currentPersonality.description}</p>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {currentPersonality.tags.map((tag) => (

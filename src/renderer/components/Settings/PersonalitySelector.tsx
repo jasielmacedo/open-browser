@@ -170,13 +170,14 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="font-semibold">{personality.name}</h4>
+                                  <h4 className="font-semibold">{personality.personName}</h4>
                                   {isSelected && (
                                     <span className="px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
                                       Active
                                     </span>
                                   )}
                                 </div>
+                                <p className="text-xs text-muted-foreground/80">{personality.name}</p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {personality.description}
                                 </p>
@@ -208,7 +209,7 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
           <div className="text-sm text-muted-foreground">
             {currentPersonality && (
               <span>
-                Currently active: <span className="font-medium text-foreground">{currentPersonality.name}</span>
+                Currently active: <span className="font-medium text-foreground">{currentPersonality.personName}</span> ({currentPersonality.name})
               </span>
             )}
           </div>

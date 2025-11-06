@@ -137,6 +137,7 @@ export interface ChatOptions {
 export interface Personality {
   id: string;
   name: string;
+  personName: string; // Real name of the personality (e.g., "Alex", "Maria")
   description: string;
   systemPrompt: string;
   icon: string;
