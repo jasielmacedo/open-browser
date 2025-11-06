@@ -22,6 +22,7 @@ export interface Message extends ChatMessage {
   };
   toolResult?: any;
   isToolExecution?: boolean;
+  thinking?: string; // Chain-of-thought reasoning from Qwen models
   timing?: {
     startTime: number;
     firstTokenTime?: number;
@@ -68,7 +69,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentModel: null,
   streamingContent: '',
   error: null,
-  planningMode: false,
+  planningMode: true, // Enable tool calling by default
 
   addMessage: (message) =>
     set((state) => ({
@@ -214,21 +215,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     let unsubscribeToken: (() => void) | undefined;
     let unsubscribeToolCalls: (() => void) | undefined;
+    let unsubscribeThinking: (() => void) | undefined;
 
     // Track timing
     const startTime = Date.now();
     let firstTokenTime: number | undefined;
 
+    // Track current message ID for listeners (will be updated for follow-up messages)
+    let currentMessageId: string;
+
     try {
       set({ isStreaming: true, error: null, streamingContent: '' });
 
       // Start a new assistant message with timing
-      const messageId = state.startNewMessage('assistant');
+      currentMessageId = state.startNewMessage('assistant');
 
       // Initialize timing for the message
       set((state) => ({
         messages: state.messages.map((m) =>
-          m.id === messageId
+          m.id === currentMessageId
             ? {
                 ...m,
                 timing: {
@@ -239,18 +244,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ),
       }));
 
+      // Set up thinking listener (for Qwen chain-of-thought reasoning)
+      unsubscribeThinking = window.electron.on('ollama:reasoning', (thinkingToken: string) => {
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === currentMessageId
+              ? {
+                  ...m,
+                  thinking: (m.thinking || '') + thinkingToken,
+                }
+              : m
+          ),
+        }));
+      });
+
       // Set up token listener
       unsubscribeToken = window.electron.on('ollama:chatToken', (token: string) => {
         // Track first token time
         if (!firstTokenTime) {
           firstTokenTime = Date.now();
           const ttft = firstTokenTime - startTime;
+          console.log(`[Chat] First token received, TTFT: ${ttft}ms`);
 
           // Update message with TTFT
           set((state) => ({
             streamingContent: state.streamingContent + token,
             messages: state.messages.map((m) =>
-              m.id === messageId
+              m.id === currentMessageId
                 ? {
                     ...m,
                     timing: {
@@ -295,19 +315,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
             console.log(`[Tool] Executing ${toolName} with args:`, toolArgs);
             const result = await executeTool(toolName, toolArgs);
 
-            // Add tool result message
-            state.addMessage({
-              role: 'tool',
-              content: JSON.stringify(result.result, null, 2),
-              toolResult: result.result,
-            });
+            // Check if tool execution had an error
+            if (result.error) {
+              console.error(`[Tool] ${toolName} returned error:`, result.error);
+              state.addMessage({
+                role: 'tool',
+                content: `Tool execution failed: ${result.error}`,
+                toolResult: { error: result.error },
+              });
+            } else {
+              // Add tool result message
+              const resultContent = result.result !== null && result.result !== undefined
+                ? JSON.stringify(result.result, null, 2)
+                : 'Tool executed successfully but returned no data';
 
-            console.log(`[Tool] ${toolName} result:`, result);
+              state.addMessage({
+                role: 'tool',
+                content: resultContent,
+                toolResult: result.result,
+              });
+
+              console.log(`[Tool] ${toolName} result:`, result);
+            }
           } catch (error: any) {
             console.error(`[Tool] ${toolName} failed:`, error);
             state.addMessage({
               role: 'tool',
-              content: `Error: ${error.message}`,
+              content: `Tool execution error: ${error.message}`,
               toolResult: { error: error.message },
             });
           }
@@ -338,7 +372,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Don't send context again - it's already in the conversation history
         try {
           // Start a new assistant message for the response after tools
-          state.startNewMessage('assistant');
+          const followUpMessageId = state.startNewMessage('assistant');
+
+          // Update the current message ID so listeners target the new message
+          currentMessageId = followUpMessageId;
+
+          // Reset streaming state for the follow-up request
+          set({ isStreaming: true, streamingContent: '' });
+
+          // The existing token listener will handle the follow-up response
+          // because appendToLastMessage always appends to the last message
+          console.log('[Tool] Continuing conversation with follow-up request');
 
           await window.electron.invoke('ollama:chat', {
             model: currentModel,
@@ -348,8 +392,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
             planningMode: shouldUseTools,
             tools: tools,
           });
+
+          // After follow-up completes, reset streaming state
+          set({ isStreaming: false, streamingContent: '' });
         } catch (error) {
           console.error('[Tool] Failed to continue conversation:', error);
+          // Reset streaming state on error
+          set({ isStreaming: false, streamingContent: '' });
+          // Add error message to UI
+          state.addMessage({
+            role: 'assistant',
+            content: `❌ **Error continuing after tool use:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
         }
       });
 
@@ -403,7 +457,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Update message with end timing
       set((state) => ({
         messages: state.messages.map((m) =>
-          m.id === messageId
+          m.id === currentMessageId
             ? {
                 ...m,
                 timing: {
@@ -418,12 +472,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       unsubscribeToken?.();
       unsubscribeToolCalls?.();
+      unsubscribeThinking?.();
       set({ isStreaming: false, streamingContent: '' });
       return { tokenEstimate };
     } catch (error) {
       console.error('Chat error:', error);
       unsubscribeToken?.();
       unsubscribeToolCalls?.();
+      unsubscribeThinking?.();
 
       // Create user-friendly error message
       let errorMessage = 'Failed to get response from AI';

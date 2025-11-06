@@ -729,7 +729,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
             <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
               {suggestions.map((suggestion, index) => (
                 <div
-                  key={suggestion.url}
+                  key={`${suggestion.url}-${index}`}
                   onClick={() => handleSuggestionClick(suggestion.url)}
                   className={`px-4 py-2 cursor-pointer transition-colors ${
                     index === selectedSuggestionIndex ? 'bg-accent' : 'hover:bg-accent'

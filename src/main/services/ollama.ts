@@ -71,6 +71,24 @@ export interface ChatRequest {
   planningMode?: boolean; // Enable tool calling behavior
 }
 
+export interface ProcessStats {
+  pid: number;
+  memory: {
+    rss: number; // Resident Set Size in bytes
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+  };
+  cpu: number; // CPU usage percentage
+  uptime: number; // Process uptime in seconds
+}
+
+export interface OllamaServiceStatus {
+  isRunning: boolean;
+  processStats?: ProcessStats;
+  error?: string;
+}
+
 export class OllamaService {
   private baseURL: string;
   private client: AxiosInstance;
@@ -78,6 +96,9 @@ export class OllamaService {
   private isServerRunning = false;
   private activePulls: Map<string, boolean> = new Map();
   private activeRequest: http.ClientRequest | null = null;
+  private processStartTime: number = 0;
+  private isStarting = false;
+  private isStopping = false;
 
   constructor(baseURL = 'http://localhost:11434') {
     this.baseURL = baseURL;
@@ -270,10 +291,43 @@ export class OllamaService {
    * Start Ollama server process
    */
   async start(): Promise<void> {
-    if (await this.isRunning()) {
-      console.log('Ollama server is already running');
+    console.log('[Ollama] start() called, current state:', {
+      isStarting: this.isStarting,
+      isStopping: this.isStopping,
+      hasProcess: !!this.process,
+      processPid: this.process?.pid,
+    });
+
+    if (this.isStarting) {
+      console.warn('[Ollama] Already starting, rejecting duplicate start');
+      throw new Error('Ollama is already starting');
+    }
+
+    if (this.isStopping) {
+      console.warn('[Ollama] Currently stopping, rejecting start');
+      throw new Error('Ollama is currently stopping, please wait');
+    }
+
+    const isRunning = await this.isRunning();
+    console.log('[Ollama] isRunning check:', isRunning);
+
+    if (isRunning) {
+      console.log('[Ollama] Server is already running, not starting new process');
+
+      // If running but we don't have a process reference, try to find it
+      if (!this.process) {
+        console.log('[Ollama] No process reference, attempting to find existing Ollama PID');
+        const existingPid = await this.findOllamaPid();
+        if (existingPid) {
+          console.log('[Ollama] Found existing Ollama process with PID:', existingPid);
+          // We can't re-attach to the process, but at least we know it exists
+        }
+      }
       return;
     }
+
+    this.isStarting = true;
+    console.log('[Ollama] Starting new Ollama process...');
 
     return new Promise((resolve, reject) => {
       try {
@@ -312,15 +366,52 @@ export class OllamaService {
         });
 
         // Spawn ollama serve process with bundled executable
-        this.process = spawn(ollamaPath, ['serve'], {
+        // On Windows, we need special handling to ensure child processes are killed
+        const spawnOptions: any = {
           stdio: 'pipe',
-          detached: false,
           env,
-        });
+        };
+
+        if (process.platform === 'win32') {
+          // On Windows, DO NOT detach so it stays in the same process group
+          // We'll use taskkill /T to kill the entire tree when stopping
+          spawnOptions.detached = false;
+          // Set the process to be killed when parent dies (Windows-specific)
+          spawnOptions.windowsHide = true;
+        } else {
+          // On Unix, create a new process group so we can kill it and its children
+          spawnOptions.detached = false;
+        }
+
+        this.process = spawn(ollamaPath, ['serve'], spawnOptions);
+
+        // Track process start time
+        this.processStartTime = Date.now();
+        const startedPid = this.process.pid;
+        console.log('[Ollama] Spawned process with PID:', startedPid);
 
         this.process.on('error', (error) => {
-          console.error('Failed to start Ollama:', error);
+          console.error('[Ollama] Process error event:', error);
+          this.processStartTime = 0;
+          this.isStarting = false;
           reject(new Error('Failed to start Ollama. Please check the installation.'));
+        });
+
+        // Track unexpected exits
+        this.process.on('exit', (code, signal) => {
+          console.warn('[Ollama] Process exited unexpectedly!', {
+            pid: startedPid,
+            code,
+            signal,
+            wasExpected: this.isStopping,
+          });
+          // Only clean up if we're not already stopping (unexpected exit)
+          if (!this.isStopping) {
+            console.error('[Ollama] UNEXPECTED EXIT - process died without being stopped!');
+            this.process = null;
+            this.isServerRunning = false;
+            this.processStartTime = 0;
+          }
         });
 
         // Wait for server to be ready
@@ -336,6 +427,7 @@ export class OllamaService {
             if (await this.isRunning()) {
               clearInterval(checkInterval);
               console.log('Ollama server started successfully');
+              this.isStarting = false;
               resolve();
             }
           } finally {
@@ -346,9 +438,11 @@ export class OllamaService {
         // Timeout after 10 seconds
         setTimeout(() => {
           clearInterval(checkInterval);
+          this.isStarting = false;
           reject(new Error('Ollama server failed to start within timeout'));
         }, 10000);
       } catch (error) {
+        this.isStarting = false;
         reject(error);
       }
     });
@@ -358,8 +452,14 @@ export class OllamaService {
    * Ensure Ollama is running, start it if not
    */
   async ensureRunning(): Promise<void> {
-    if (!(await this.isRunning())) {
+    const isRunning = await this.isRunning();
+    console.log('[Ollama] ensureRunning check:', isRunning);
+
+    if (!isRunning) {
+      console.log('[Ollama] Service not running, calling start()');
       await this.start();
+    } else {
+      console.log('[Ollama] Service already running, skipping start');
     }
   }
 
@@ -472,35 +572,52 @@ export class OllamaService {
    * Stop Ollama server process with force
    */
   async stop(): Promise<void> {
+    if (this.isStopping) {
+      throw new Error('Ollama is already stopping');
+    }
+
     if (!this.process) {
       console.log('[Ollama] No process to stop');
       return;
     }
 
+    this.isStopping = true;
     const pid = this.process.pid;
     console.log(`[Ollama] Stopping Ollama process (PID: ${pid})`);
 
     return new Promise<void>((resolve) => {
       if (!this.process) {
+        this.isStopping = false;
         resolve();
         return;
       }
 
+      // On Windows, Ollama spawns child processes (especially for vision models)
+      // We need to kill ALL ollama.exe processes, not just the tree from our PID
+      // This is because vision models may spawn detached worker processes
+      if (process.platform === 'win32') {
+        console.log('[Ollama] Killing all ollama.exe processes on Windows');
+        exec('taskkill /F /IM ollama.exe /T', (error) => {
+          if (error) {
+            // This might error if no processes found, which is fine
+            console.log('[Ollama] taskkill completed (may have been no processes)');
+          } else {
+            console.log('[Ollama] All ollama.exe processes killed successfully');
+          }
+          this.process = null;
+          this.isServerRunning = false;
+          this.processStartTime = 0;
+          this.isStopping = false;
+          resolve();
+        });
+        return;
+      }
+
+      // On Unix, try graceful shutdown first
       const timeout = setTimeout(() => {
         console.warn('[Ollama] Process did not exit gracefully, forcing termination');
 
-        // Force kill the process using platform-specific commands
-        if (process.platform === 'win32' && pid) {
-          // Use taskkill on Windows with /F flag for forceful termination
-          exec(`taskkill /F /PID ${pid} /T`, (error) => {
-            if (error) {
-              console.error('[Ollama] Failed to force kill process:', error);
-            }
-            this.process = null;
-            this.isServerRunning = false;
-            resolve();
-          });
-        } else if (pid) {
+        if (pid) {
           // Use SIGKILL on Unix-like systems
           try {
             process.kill(pid, 'SIGKILL');
@@ -509,6 +626,8 @@ export class OllamaService {
           }
           this.process = null;
           this.isServerRunning = false;
+          this.processStartTime = 0;
+          this.isStopping = false;
           resolve();
         }
       }, 3000); // Wait 3 seconds for graceful shutdown
@@ -518,24 +637,296 @@ export class OllamaService {
         console.log(`[Ollama] Process exited with code ${code} and signal ${signal}`);
         this.process = null;
         this.isServerRunning = false;
+        this.processStartTime = 0;
+        this.isStopping = false;
         resolve();
       });
 
-      // Try graceful shutdown first
+      // Try graceful shutdown first on Unix
       try {
-        if (process.platform === 'win32') {
-          // On Windows, send SIGTERM (which is translated to a termination request)
-          this.process.kill('SIGTERM');
-        } else {
-          // On Unix, send SIGTERM for graceful shutdown
-          this.process.kill('SIGTERM');
-        }
+        this.process.kill('SIGTERM');
       } catch (err) {
         console.error('[Ollama] Failed to send termination signal:', err);
         clearTimeout(timeout);
         this.process = null;
         this.isServerRunning = false;
+        this.processStartTime = 0;
+        this.isStopping = false;
         resolve();
+      }
+    });
+  }
+
+  /**
+   * Find the PID of a running Ollama process
+   */
+  private async findOllamaPid(): Promise<number | null> {
+    return new Promise<number | null>((resolve) => {
+      if (process.platform === 'win32') {
+        exec('tasklist /FI "IMAGENAME eq ollama.exe" /FO CSV /NH', { timeout: 3000 }, (error, stdout) => {
+          if (error || !stdout || stdout.includes('INFO: No tasks are running')) {
+            resolve(null);
+            return;
+          }
+
+          // Parse the first ollama.exe process found
+          const match = stdout.match(/"ollama\.exe","(\d+)"/);
+          if (match && match[1]) {
+            resolve(parseInt(match[1], 10));
+          } else {
+            resolve(null);
+          }
+        });
+      } else {
+        exec('pgrep -f "ollama"', { timeout: 3000 }, (error, stdout) => {
+          if (error || !stdout.trim()) {
+            resolve(null);
+            return;
+          }
+
+          const pids = stdout.trim().split('\n');
+          if (pids.length > 0 && pids[0]) {
+            resolve(parseInt(pids[0], 10));
+          } else {
+            resolve(null);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Get process statistics for the Ollama server
+   */
+  async getProcessStats(): Promise<ProcessStats | null> {
+    let pid: number | undefined;
+
+    // If we have a reference to the process, use its PID
+    if (this.process && this.process.pid) {
+      pid = this.process.pid;
+    } else {
+      // Otherwise, try to find the Ollama process by name
+      pid = await this.findOllamaPid();
+      if (!pid) {
+        return null;
+      }
+    }
+
+    return new Promise<ProcessStats | null>((resolve) => {
+      // Set a timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        console.warn('[Ollama] getProcessStats timeout');
+        resolve(null);
+      }, 5000);
+
+      if (process.platform === 'win32') {
+        // On Windows, use wmic to get process info
+        exec(
+          `wmic process where processid=${pid} get WorkingSetSize,KernelModeTime,UserModeTime /format:csv`,
+          { timeout: 5000 },
+          (error, stdout) => {
+            clearTimeout(timeout);
+            if (error) {
+              console.error('[Ollama] Failed to get process stats:', error);
+              resolve(null);
+              return;
+            }
+
+            try {
+              // Parse CSV output (skip header and node line)
+              const lines = stdout.trim().split('\n').filter(line => line.trim());
+              if (lines.length < 2) {
+                resolve(null);
+                return;
+              }
+
+              const dataLine = lines[lines.length - 1];
+              const parts = dataLine.split(',');
+
+              if (parts.length >= 4) {
+                const workingSetSize = parseInt(parts[3], 10); // Memory in bytes
+
+                // Calculate uptime (0 if we don't have start time)
+                const uptime = this.processStartTime > 0
+                  ? Math.floor((Date.now() - this.processStartTime) / 1000)
+                  : 0;
+
+                resolve({
+                  pid,
+                  memory: {
+                    rss: workingSetSize || 0,
+                    heapTotal: 0,
+                    heapUsed: 0,
+                    external: 0,
+                  },
+                  cpu: 0, // CPU calculation is complex on Windows, would need multiple samples
+                  uptime,
+                });
+              } else {
+                resolve(null);
+              }
+            } catch (parseError) {
+              console.error('[Ollama] Failed to parse process stats:', parseError);
+              resolve(null);
+            }
+          }
+        );
+      } else {
+        // On Unix, use ps command
+        exec(`ps -p ${pid} -o rss=,pcpu=`, { timeout: 5000 }, (error, stdout) => {
+          clearTimeout(timeout);
+          if (error) {
+            console.error('[Ollama] Failed to get process stats:', error);
+            resolve(null);
+            return;
+          }
+
+          try {
+            const output = stdout.trim().split(/\s+/);
+            const rss = parseInt(output[0], 10) * 1024; // Convert KB to bytes
+            const cpu = parseFloat(output[1]);
+
+            const uptime = this.processStartTime > 0
+              ? Math.floor((Date.now() - this.processStartTime) / 1000)
+              : 0;
+
+            resolve({
+              pid,
+              memory: {
+                rss,
+                heapTotal: 0,
+                heapUsed: 0,
+                external: 0,
+              },
+              cpu,
+              uptime,
+            });
+          } catch (parseError) {
+            console.error('[Ollama] Failed to parse process stats:', parseError);
+            resolve(null);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Get comprehensive service status including process stats
+   */
+  async getServiceStatus(): Promise<OllamaServiceStatus> {
+    const isRunning = await this.isRunning();
+    console.log('[Ollama] getServiceStatus - isRunning:', isRunning);
+
+    if (!isRunning) {
+      return {
+        isRunning: false,
+        error: 'Ollama service is not running',
+      };
+    }
+
+    const processStats = await this.getProcessStats();
+    console.log('[Ollama] getServiceStatus - processStats:', processStats);
+
+    return {
+      isRunning: true,
+      processStats: processStats || undefined,
+    };
+  }
+
+  /**
+   * Restart the Ollama service
+   */
+  async restart(): Promise<void> {
+    console.log('[Ollama] Restarting service...');
+
+    // Stop the service and wait for it to fully stop
+    await this.stop();
+
+    // Wait for stop to complete (isStopping flag will be reset by stop())
+    // Add extra delay to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Verify process is fully stopped before starting
+    if (this.process) {
+      throw new Error('Failed to stop Ollama completely before restart');
+    }
+
+    await this.start();
+    console.log('[Ollama] Service restarted successfully');
+  }
+
+  /**
+   * Force kill the Ollama process immediately
+   */
+  async forceKill(): Promise<void> {
+    if (!this.process || !this.process.pid) {
+      console.log('[Ollama] No process to kill');
+      return;
+    }
+
+    if (this.isStopping) {
+      throw new Error('Ollama is already stopping, use stop() instead');
+    }
+
+    const pid = this.process.pid;
+    const processRef = this.process;
+    console.log(`[Ollama] Force killing process (PID: ${pid})`);
+
+    return new Promise<void>((resolve) => {
+      // Set up exit listener before killing
+      const exitHandler = () => {
+        console.log('[Ollama] Process killed');
+        this.process = null;
+        this.isServerRunning = false;
+        this.processStartTime = 0;
+        this.isStopping = false;
+        resolve();
+      };
+
+      // Add timeout in case exit event doesn't fire
+      const timeout = setTimeout(() => {
+        processRef.removeListener('exit', exitHandler);
+        console.warn('[Ollama] Force kill timeout, cleaning up anyway');
+        this.process = null;
+        this.isServerRunning = false;
+        this.processStartTime = 0;
+        this.isStopping = false;
+        resolve();
+      }, 3000);
+
+      processRef.once('exit', () => {
+        clearTimeout(timeout);
+        exitHandler();
+      });
+
+      if (process.platform === 'win32') {
+        // Kill ALL ollama.exe processes to ensure vision model workers are killed too
+        exec('taskkill /F /IM ollama.exe /T', (error) => {
+          if (error) {
+            console.error('[Ollama] Failed to force kill processes:', error);
+          }
+          // Always clean up our reference
+          clearTimeout(timeout);
+          processRef.removeListener('exit', exitHandler);
+          this.process = null;
+          this.isServerRunning = false;
+          this.processStartTime = 0;
+          this.isStopping = false;
+          resolve();
+        });
+      } else {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch (err) {
+          console.error('[Ollama] Failed to send SIGKILL:', err);
+          clearTimeout(timeout);
+          processRef.removeListener('exit', exitHandler);
+          this.process = null;
+          this.isServerRunning = false;
+          this.processStartTime = 0;
+          this.isStopping = false;
+          resolve();
+        }
       }
     });
   }
@@ -919,12 +1310,32 @@ export class OllamaService {
       console.log(
         `[Ollama] Using ${useAggressiveParsing ? 'aggressive' : 'standard'} parsing for model: ${request.model}`
       );
+      console.log('[Ollama] Waiting for stream data...');
+
+      const streamStartTime = Date.now();
+      let firstChunkTime: number | undefined;
 
       for await (const chunk of stream) {
         chunkCount++;
-        const chunkStr = chunk.toString();
 
+        // Track when first chunk arrives
+        if (!firstChunkTime) {
+          firstChunkTime = Date.now();
+          const waitTime = firstChunkTime - streamStartTime;
+          console.log(`[Ollama] First chunk received after ${waitTime}ms`);
+        }
+
+        const chunkStr = chunk.toString();
         buffer += chunkStr;
+
+        // Log periodically to show stream is alive
+        if (chunkCount % 100 === 0) {
+          console.log(`[Ollama] Received ${chunkCount} chunks, ${tokenCount} tokens, buffer size: ${buffer.length}`);
+          // Debug: Show buffer content if no tokens are being extracted
+          if (tokenCount === 0 && chunkCount >= 100) {
+            console.log('[Ollama] DEBUG - Buffer sample:', buffer.substring(0, 200));
+          }
+        }
 
         // Aggressive parsing for models that concatenate JSON without newlines (e.g., Qwen)
         if (useAggressiveParsing) {
@@ -932,7 +1343,41 @@ export class OllamaService {
           while (processedSomething && buffer.length > 0) {
             processedSomething = false;
 
-            // Try to find concatenated JSON objects (}{)
+            // Strategy 1: Try to parse buffer as complete JSON (for small chunks)
+            if (buffer.length < 500 && buffer.trim().startsWith('{') && buffer.trim().endsWith('}')) {
+              try {
+                const data = JSON.parse(buffer);
+                processedSomething = true;
+                buffer = '';
+
+                if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                  yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                }
+
+                // Qwen sends 'thinking' field (internal reasoning) - yield it separately from content
+                if (data.message?.thinking) {
+                  yield { type: 'thinking', content: data.message.thinking };
+                }
+
+                if (data.message?.content) {
+                  tokenCount++;
+                  yield data.message.content;
+                }
+
+                if (data.done) {
+                  console.log(
+                    `[Ollama] Stream completed. Chunks: ${chunkCount}, Tokens: ${tokenCount}`
+                  );
+                  this.activeRequest = null;
+                  return;
+                }
+                continue; // Skip other strategies if this worked
+              } catch (_e) {
+                // Not valid JSON yet, try other strategies
+              }
+            }
+
+            // Strategy 2: Try to find concatenated JSON objects (}{)
             if (buffer.includes('}{')) {
               const parts = buffer.split(/(?<=\})(?=\{)/);
               if (parts.length > 1) {
@@ -946,6 +1391,11 @@ export class OllamaService {
 
                       if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
                         yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                      }
+
+                      // Yield thinking separately from content
+                      if (data.message?.thinking) {
+                        yield { type: 'thinking', content: data.message.thinking };
                       }
 
                       if (data.message?.content) {
@@ -968,7 +1418,7 @@ export class OllamaService {
               }
             }
 
-            // Also try line-based for Qwen (in case format changes)
+            // Strategy 3: Line-based parsing (in case format changes)
             if (buffer.includes('\n')) {
               const lines = buffer.split('\n');
               buffer = lines.pop() || '';
@@ -981,6 +1431,11 @@ export class OllamaService {
 
                     if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
                       yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
+                    }
+
+                    // Yield thinking separately from content
+                    if (data.message?.thinking) {
+                      yield { type: 'thinking', content: data.message.thinking };
                     }
 
                     if (data.message?.content) {
@@ -1017,6 +1472,11 @@ export class OllamaService {
                     yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
                   }
 
+                  // Yield thinking separately from content
+                  if (data.message?.thinking) {
+                    yield { type: 'thinking', content: data.message.thinking };
+                  }
+
                   if (data.message?.content) {
                     tokenCount++;
                     yield data.message.content;
@@ -1045,6 +1505,11 @@ export class OllamaService {
           if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
             yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
           }
+          // Yield thinking separately from content
+          if (data.message?.thinking) {
+            yield { type: 'thinking', content: data.message.thinking };
+          }
+
           if (data.message?.content) {
             tokenCount++;
             yield data.message.content;

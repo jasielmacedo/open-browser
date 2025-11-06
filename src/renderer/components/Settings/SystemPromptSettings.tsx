@@ -51,10 +51,8 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
   };
 
   const handleReset = () => {
-    if (confirm('Are you sure you want to reset to default settings?')) {
-      setSystemPrompt(
-        'You are a helpful AI assistant integrated into a web browser. Provide clear, concise, and accurate responses.'
-      );
+    if (confirm('Are you sure you want to clear all custom settings? The base system prompt will remain active.')) {
+      setSystemPrompt('');
       setUserInfo('');
       setCustomInstructions('');
     }
@@ -86,22 +84,29 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Info Banner */}
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <p className="text-sm text-blue-400">
+              <strong>Note:</strong> A comprehensive base system prompt is always active. Your customizations below are <strong>added to</strong> the base prompt, not replacing it.
+            </p>
+          </div>
+
           {/* System Prompt */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              System Prompt
+              Additional Instructions
               <span className="text-muted-foreground ml-2 font-normal">
-                (Base instructions for the AI)
+                (Add to base prompt - optional)
               </span>
             </label>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Enter the base system prompt for the AI..."
+              placeholder="Add any additional instructions or modify the AI's behavior here..."
               className="w-full h-32 px-3 py-2 bg-secondary border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              This is the core instruction that defines how the AI should behave.
+              These instructions will be added to the comprehensive base prompt that explains the AI's capabilities and environment.
             </p>
           </div>
 

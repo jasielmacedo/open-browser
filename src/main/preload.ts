@@ -33,6 +33,7 @@ const ALLOWED_INVOKE_CHANNELS = [
   'ollama:deleteModel',
   'ollama:generate',
   'ollama:chat',
+  'ollama:getStatus',
   'tool:search_history',
   'tool:get_bookmarks',
   'tool:analyze_page_content',
@@ -41,6 +42,11 @@ const ALLOWED_INVOKE_CHANNELS = [
   'tool:web_search',
   'settings:get',
   'settings:set',
+  'models:getFolder',
+  'models:list',
+  'models:pull-progress',
+  'models:openFolder',
+  'models:selectFolder',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -49,6 +55,8 @@ const ALLOWED_LISTEN_CHANNELS = [
   'ollama:generateToken',
   'ollama:chatToken',
   'ollama:toolCalls',
+  'ollama:reasoning',
+  'ollama:getStatus',
   'ai-ask-about-selection',
   'ai-explain-selection',
   'ai-translate-selection',
