@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { databaseService } from './services/database';
 import { ollamaService } from './services/ollama';
+import { downloadService } from './services/download';
 import { registerIpcHandlers } from './ipc/handlers';
 
 // Polyfill __dirname for ESM
@@ -15,6 +16,7 @@ console.log('===== IMPORTS COMPLETED =====');
 console.log('===== SETUP COMPLETED =====');
 
 let mainWindow: BrowserWindow | null = null;
+let downloadManagerWindow: BrowserWindow | null = null;
 
 // Window state persistence
 interface WindowState {
@@ -154,6 +156,59 @@ const createWindow = () => {
   });
 };
 
+// Create download manager window
+export const createDownloadManagerWindow = () => {
+  // If window already exists, focus it
+  if (downloadManagerWindow && !downloadManagerWindow.isDestroyed()) {
+    downloadManagerWindow.focus();
+    return;
+  }
+
+  // Create the download manager window
+  downloadManagerWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    minWidth: 600,
+    minHeight: 400,
+    parent: mainWindow || undefined,
+    modal: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: true,
+    },
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#1a1d24',
+    show: false,
+    autoHideMenuBar: true,
+    frame: true,
+  });
+
+  // Load the download manager page
+  if (process.env.VITE_DEV_SERVER_URL) {
+    downloadManagerWindow.loadURL(process.env.VITE_DEV_SERVER_URL + '#/downloads');
+  } else {
+    downloadManagerWindow.loadFile(path.join(__dirname, '../renderer/index.html'), {
+      hash: 'downloads',
+    });
+  }
+
+  // Remove the default menu
+  Menu.setApplicationMenu(null);
+
+  // Show window when ready
+  downloadManagerWindow.once('ready-to-show', () => {
+    downloadManagerWindow?.show();
+  });
+
+  // Clean up reference when closed
+  downloadManagerWindow.on('closed', () => {
+    downloadManagerWindow = null;
+  });
+};
+
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   // Initialize database
@@ -192,50 +247,24 @@ app.whenReady().then(async () => {
     );
   }
 
-  // Setup download handling
-  session.defaultSession.on('will-download', (_event, item, _webContents) => {
-    // Save to default downloads folder with sanitized filename
-    let filename = item.getFilename();
+  // Setup download handling with the download service
+  session.defaultSession.on('will-download', (_event, item, webContents) => {
+    // Check if there's a custom save path for this URL (e.g., from Save Image As)
+    const customPath = downloadService.getCustomSavePath(item.getURL());
 
-    // Sanitize filename to prevent path traversal attacks
-    // Remove path separators and other dangerous characters
-    // eslint-disable-next-line no-control-regex
-    filename = path.basename(filename).replace(/[<>:"|?*\x00-\x1F]/g, '_');
-
-    // Prevent hidden files and ensure filename is not empty
-    if (!filename || filename.startsWith('.')) {
-      filename = 'download_' + Date.now();
+    let savePath: string;
+    if (customPath) {
+      // Use the custom path chosen by user
+      savePath = customPath;
+    } else {
+      // Use default download folder with unique filename
+      const filename = downloadService.sanitizeFilename(item.getFilename());
+      const downloadFolder = downloadService.getDefaultDownloadFolder();
+      savePath = downloadService.getUniqueFilename(downloadFolder, filename);
     }
 
-    // Limit filename length to prevent issues
-    if (filename.length > 255) {
-      const ext = path.extname(filename);
-      filename = filename.substring(0, 255 - ext.length) + ext;
-    }
-
-    const downloadPath = path.join(app.getPath('downloads'), filename);
-    item.setSavePath(downloadPath);
-
-    item.on('updated', (event, state) => {
-      if (state === 'interrupted') {
-        console.log('Download interrupted:', filename);
-      } else if (state === 'progressing') {
-        if (item.isPaused()) {
-          console.log('Download paused:', filename);
-        } else {
-          const percent = Math.round((item.getReceivedBytes() / item.getTotalBytes()) * 100);
-          console.log(`Download progress for ${filename}: ${percent}%`);
-        }
-      }
-    });
-
-    item.once('done', (event, state) => {
-      if (state === 'completed') {
-        console.log('Download completed:', downloadPath);
-      } else {
-        console.log('Download failed:', state);
-      }
-    });
+    // Handle the download with the service
+    downloadService.handleDownload(item, savePath, webContents);
   });
 
   createWindow();
@@ -426,6 +455,46 @@ app.on('web-contents-created', (event, contents) => {
 
       // Separator if we added edit items
       if (params.editFlags.canCut || params.editFlags.canCopy || params.editFlags.canPaste) {
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // Save Image As for images
+      if (params.mediaType === 'image' && params.srcURL) {
+        menu.append(
+          new MenuItem({
+            label: 'Save Image As...',
+            click: async () => {
+              try {
+                const imageUrl = params.srcURL;
+                const suggestedName = path.basename(new URL(imageUrl).pathname) || 'image.png';
+                const savePath = await downloadService.chooseSaveLocation(
+                  mainWindow,
+                  suggestedName
+                );
+                if (savePath) {
+                  // Register the custom save path for this URL
+                  downloadService.setCustomSavePath(imageUrl, savePath);
+                  // Trigger download - will use the custom path
+                  contents.downloadURL(imageUrl);
+                }
+              } catch (error) {
+                console.error('Failed to save image:', error);
+              }
+            },
+          })
+        );
+
+        menu.append(
+          new MenuItem({
+            label: 'Copy Image',
+            click: () => {
+              // Copy image to clipboard - this will copy the image URL for now
+              // In a full implementation, you'd fetch and copy the actual image data
+              contents.copyImageAt(params.x, params.y);
+            },
+          })
+        );
+
         menu.append(new MenuItem({ type: 'separator' }));
       }
 

@@ -32,6 +32,20 @@ export interface Tab {
   position: number;
 }
 
+export interface Download {
+  id?: number;
+  url: string;
+  filename: string;
+  savePath: string;
+  totalBytes: number;
+  receivedBytes: number;
+  state: 'in_progress' | 'completed' | 'paused' | 'cancelled' | 'failed';
+  mimeType?: string;
+  startTime: number;
+  endTime?: number;
+  error?: string;
+}
+
 class DatabaseService {
   private db: Database.Database | null = null;
 
@@ -151,6 +165,26 @@ class DatabaseService {
       );
     `);
 
+    // Downloads table for user downloads (separate from model downloads)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS downloads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        save_path TEXT NOT NULL,
+        total_bytes INTEGER NOT NULL,
+        received_bytes INTEGER NOT NULL,
+        state TEXT NOT NULL,
+        mime_type TEXT,
+        start_time INTEGER NOT NULL,
+        end_time INTEGER,
+        error TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_downloads_start_time ON downloads(start_time DESC);
+      CREATE INDEX IF NOT EXISTS idx_downloads_state ON downloads(state);
+    `);
+
     // Initialize default system prompt if not exists
     const systemPrompt = this.getSetting('system-prompt');
     if (!systemPrompt) {
@@ -168,6 +202,18 @@ class DatabaseService {
     const customInstructions = this.getSetting('custom-instructions');
     if (!customInstructions) {
       this.setSetting('custom-instructions', '');
+    }
+
+    // Initialize default download settings if not exists
+    const defaultDownloadFolder = this.getSetting('default-download-folder');
+    if (!defaultDownloadFolder) {
+      // Will be set to user's Downloads folder on first use
+      this.setSetting('default-download-folder', '');
+    }
+
+    const askDownloadLocation = this.getSetting('ask-download-location');
+    if (!askDownloadLocation) {
+      this.setSetting('ask-download-location', 'false');
     }
   }
 
@@ -530,6 +576,130 @@ class DatabaseService {
     `
       )
       .run(key, value, Date.now());
+  }
+
+  // Download operations
+  addDownload(download: Download): number {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Validate URL for security
+    validateUrl(download.url, 'Download URL');
+
+    const result = this.db
+      .prepare(
+        `
+        INSERT INTO downloads (url, filename, save_path, total_bytes, received_bytes, state, mime_type, start_time, end_time, error)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(
+        download.url,
+        download.filename,
+        download.savePath,
+        download.totalBytes,
+        download.receivedBytes,
+        download.state,
+        download.mimeType || null,
+        download.startTime,
+        download.endTime || null,
+        download.error || null
+      );
+    return result.lastInsertRowid as number;
+  }
+
+  updateDownload(id: number, updates: Partial<Download>): void {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const allowedFields = [
+      'received_bytes',
+      'state',
+      'end_time',
+      'error',
+      'total_bytes',
+    ] as const;
+
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    for (const field of allowedFields) {
+      if (updates[field as keyof Download] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(updates[field as keyof Download]);
+      }
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const query = `UPDATE downloads SET ${fields.join(', ')} WHERE id = ?`;
+    this.db.prepare(query).run(...values);
+  }
+
+  getDownload(id: number): Download | null {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = this.db
+      .prepare(
+        `
+      SELECT id, url, filename, save_path as savePath, total_bytes as totalBytes,
+             received_bytes as receivedBytes, state, mime_type as mimeType,
+             start_time as startTime, end_time as endTime, error
+      FROM downloads
+      WHERE id = ?
+    `
+      )
+      .get(id) as Download | undefined;
+
+    return result || null;
+  }
+
+  getDownloads(limit = 100, offset = 0): Download[] {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return this.db
+      .prepare(
+        `
+      SELECT id, url, filename, save_path as savePath, total_bytes as totalBytes,
+             received_bytes as receivedBytes, state, mime_type as mimeType,
+             start_time as startTime, end_time as endTime, error
+      FROM downloads
+      ORDER BY start_time DESC
+      LIMIT ? OFFSET ?
+    `
+      )
+      .all(limit, offset) as Download[];
+  }
+
+  getActiveDownloads(): Download[] {
+    if (!this.db) throw new Error('Database not initialized');
+
+    return this.db
+      .prepare(
+        `
+      SELECT id, url, filename, save_path as savePath, total_bytes as totalBytes,
+             received_bytes as receivedBytes, state, mime_type as mimeType,
+             start_time as startTime, end_time as endTime, error
+      FROM downloads
+      WHERE state = 'in_progress' OR state = 'paused'
+      ORDER BY start_time DESC
+    `
+      )
+      .all() as Download[];
+  }
+
+  deleteDownload(id: number): void {
+    if (!this.db) throw new Error('Database not initialized');
+    this.db.prepare('DELETE FROM downloads WHERE id = ?').run(id);
+  }
+
+  clearDownloads(olderThan?: number): void {
+    if (!this.db) throw new Error('Database not initialized');
+
+    if (olderThan) {
+      this.db.prepare('DELETE FROM downloads WHERE start_time < ?').run(olderThan);
+    } else {
+      this.db.prepare('DELETE FROM downloads WHERE state != "in_progress"').run();
+    }
   }
 
   close() {

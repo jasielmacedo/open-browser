@@ -47,6 +47,20 @@ const ALLOWED_INVOKE_CHANNELS = [
   'models:pull-progress',
   'models:openFolder',
   'models:selectFolder',
+  'download:getAll',
+  'download:getActive',
+  'download:pause',
+  'download:resume',
+  'download:cancel',
+  'download:open',
+  'download:showInFolder',
+  'download:delete',
+  'download:clear',
+  'download:getDefaultFolder',
+  'download:chooseFolder',
+  'download:chooseSaveLocation',
+  'download:openManager',
+  'download:saveImage',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -61,6 +75,8 @@ const ALLOWED_LISTEN_CHANNELS = [
   'ai-explain-selection',
   'ai-translate-selection',
   'ai-summarize-selection',
+  'download:progress',
+  'download:complete',
 ];
 
 // Expose protected methods that allow the renderer process to use
