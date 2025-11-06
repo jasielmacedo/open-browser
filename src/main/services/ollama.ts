@@ -69,6 +69,7 @@ export interface ChatRequest {
   context?: AIContext;
   tools?: any[]; // Tool definitions in Ollama format
   planningMode?: boolean; // Enable tool calling behavior
+  think?: boolean; // Enable thinking/reasoning mode (Qwen models)
 }
 
 export interface ProcessStats {
@@ -1242,6 +1243,11 @@ export class OllamaService {
       // Add tools if planning mode is enabled
       if (request.planningMode && request.tools && request.tools.length > 0) {
         ollamaRequest.tools = request.tools;
+      }
+
+      // Add think parameter if enabled (for Qwen models with reasoning)
+      if (request.think !== undefined) {
+        ollamaRequest.think = request.think;
       }
 
       console.log('[Ollama] Sending chat request:', JSON.stringify(ollamaRequest, null, 2));

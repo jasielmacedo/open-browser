@@ -403,6 +403,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             stream: true,
             planningMode: shouldUseTools,
             tools: tools,
+            think: planningMode, // Enable thinking mode for reasoning models
           });
 
           // After follow-up completes, reset streaming state
@@ -460,6 +461,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         stream: true,
         planningMode: shouldUseTools,
         tools: tools,
+        think: planningMode, // Enable thinking mode for reasoning models
       });
 
       // Track end time and calculate total time
