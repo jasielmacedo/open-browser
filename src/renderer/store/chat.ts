@@ -63,13 +63,24 @@ interface ChatState {
   ) => Promise<{ tokenEstimate?: number }>;
 }
 
+// Initialize thinking mode from database
+const initializeThinkingMode = async (): Promise<boolean> => {
+  try {
+    const thinkingMode = await window.electron.invoke('settings:get', 'thinking-mode');
+    return thinkingMode !== false; // Default to true if not set
+  } catch (error) {
+    console.error('Failed to load thinking mode setting:', error);
+    return true; // Default to true on error
+  }
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
   currentModel: null,
   streamingContent: '',
   error: null,
-  planningMode: true, // Enable tool calling by default
+  planningMode: true, // Will be initialized from database
 
   addMessage: (message) =>
     set((state) => ({
@@ -516,3 +527,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 }));
+
+// Initialize thinking mode from database on app load
+export const initializeChatSettings = async () => {
+  const thinkingMode = await initializeThinkingMode();
+  useChatStore.setState({ planningMode: thinkingMode });
+};
+
+// Refresh thinking mode from database (call this when settings are changed)
+export const refreshThinkingMode = async () => {
+  const thinkingMode = await initializeThinkingMode();
+  useChatStore.setState({ planningMode: thinkingMode });
+};

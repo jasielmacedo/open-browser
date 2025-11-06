@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PersonalitySelector } from './PersonalitySelector';
 import type { Personality } from '../../../shared/types';
+import { refreshThinkingMode } from '../../store/chat';
 
 interface SystemPromptSettingsProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
   const [systemPrompt, setSystemPrompt] = useState('');
   const [userInfo, setUserInfo] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [thinkingMode, setThinkingMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPersonalitySelectorOpen, setIsPersonalitySelectorOpen] = useState(false);
   const [currentPersonality, setCurrentPersonality] = useState<Personality | null>(null);
@@ -23,17 +25,19 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
 
   const loadSettings = async () => {
     try {
-      const [prompt, info, instructions, personality] = await Promise.all([
+      const [prompt, info, instructions, personality, thinking] = await Promise.all([
         window.electron.invoke('settings:get', 'system-prompt'),
         window.electron.invoke('settings:get', 'user-info'),
         window.electron.invoke('settings:get', 'custom-instructions'),
         window.electron.invoke('personalities:getCurrent'),
+        window.electron.invoke('settings:get', 'thinking-mode'),
       ]);
 
       setSystemPrompt(prompt || '');
       setUserInfo(info || '');
       setCustomInstructions(instructions || '');
       setCurrentPersonality(personality);
+      setThinkingMode(thinking !== false); // Default to true if not set
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -46,7 +50,10 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
         window.electron.invoke('settings:set', 'system-prompt', systemPrompt),
         window.electron.invoke('settings:set', 'user-info', userInfo),
         window.electron.invoke('settings:set', 'custom-instructions', customInstructions),
+        window.electron.invoke('settings:set', 'thinking-mode', thinkingMode),
       ]);
+      // Refresh thinking mode in chat store
+      await refreshThinkingMode();
       onClose();
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -65,6 +72,7 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
       setSystemPrompt('');
       setUserInfo('');
       setCustomInstructions('');
+      setThinkingMode(true); // Reset to default (enabled)
     }
   };
 
@@ -144,6 +152,48 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
               ) : (
                 <p className="text-sm text-muted-foreground">No personality selected</p>
               )}
+            </div>
+
+            {/* Thinking Mode Toggle */}
+            <div className="p-4 bg-accent/30 border border-border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">Thinking Mode</label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable advanced reasoning and tool calling for complex tasks. Disable for faster,
+                    direct responses to simple questions.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setThinkingMode(!thinkingMode)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    thinkingMode ? 'bg-primary' : 'bg-muted'
+                  }`}
+                  role="switch"
+                  aria-checked={thinkingMode}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      thinkingMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="mt-3 text-xs">
+                <p className="text-muted-foreground">
+                  {thinkingMode ? (
+                    <>
+                      <span className="text-green-400">✓ Enabled</span> - AI can use tools like web
+                      search, analyze pages, and access history for comprehensive answers
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-orange-400">○ Disabled</span> - AI will provide quick,
+                      direct responses without tool calling or planning
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
 
             {/* System Prompt */}
