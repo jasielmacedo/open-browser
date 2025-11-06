@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { PersonalitySelector } from './PersonalitySelector';
+import type { Personality } from '../../../shared/types';
 
 interface SystemPromptSettingsProps {
   isOpen: boolean;
@@ -10,6 +12,8 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
   const [userInfo, setUserInfo] = useState('');
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isPersonalitySelectorOpen, setIsPersonalitySelectorOpen] = useState(false);
+  const [currentPersonality, setCurrentPersonality] = useState<Personality | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -19,15 +23,17 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
 
   const loadSettings = async () => {
     try {
-      const [prompt, info, instructions] = await Promise.all([
+      const [prompt, info, instructions, personality] = await Promise.all([
         window.electron.invoke('settings:get', 'system-prompt'),
         window.electron.invoke('settings:get', 'user-info'),
         window.electron.invoke('settings:get', 'custom-instructions'),
+        window.electron.invoke('personalities:getCurrent'),
       ]);
 
       setSystemPrompt(prompt || '');
       setUserInfo(info || '');
       setCustomInstructions(instructions || '');
+      setCurrentPersonality(personality);
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
@@ -58,10 +64,17 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
     }
   };
 
+  const handlePersonalitySelectorClose = () => {
+    setIsPersonalitySelectorOpen(false);
+    // Reload personality after selection
+    loadSettings();
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
@@ -89,6 +102,40 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
             <p className="text-sm text-blue-400">
               <strong>Note:</strong> A comprehensive base system prompt is always active. Your customizations below are <strong>added to</strong> the base prompt, not replacing it.
             </p>
+          </div>
+
+          {/* AI Personality Section */}
+          <div className="p-4 bg-accent/30 border border-border rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">AI Personality</label>
+              <button
+                onClick={() => setIsPersonalitySelectorOpen(true)}
+                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+              >
+                Change Personality
+              </button>
+            </div>
+            {currentPersonality ? (
+              <div className="flex items-start gap-3 mt-3">
+                <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl flex-shrink-0">
+                  {getIconEmoji(currentPersonality.icon)}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium">{currentPersonality.personName}</h4>
+                  <p className="text-xs text-muted-foreground/80">{currentPersonality.name}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{currentPersonality.description}</p>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {currentPersonality.tags.map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 text-xs bg-muted rounded">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No personality selected</p>
+            )}
           </div>
 
           {/* System Prompt */}
@@ -201,6 +248,41 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Personality Selector Modal */}
+      <PersonalitySelector
+        isOpen={isPersonalitySelectorOpen}
+        onClose={handlePersonalitySelectorClose}
+      />
+    </>
   );
 };
+
+// Helper function to get emoji for icon names
+function getIconEmoji(iconName: string): string {
+  const iconMap: Record<string, string> = {
+    briefcase: '💼',
+    code: '💻',
+    target: '🎯',
+    calendar: '📅',
+    book: '📚',
+    users: '👥',
+    'book-open': '📖',
+    zap: '⚡',
+    palette: '🎨',
+    gamepad: '🎮',
+    smile: '😄',
+    'message-circle': '💬',
+    image: '🖼️',
+    coffee: '☕',
+    theater: '🎭',
+    heart: '❤️',
+    compass: '🧭',
+    'book-heart': '📚',
+    'shield-heart': '🛡️',
+    sparkles: '✨',
+  };
+
+  return iconMap[iconName] || '🤖';
+}

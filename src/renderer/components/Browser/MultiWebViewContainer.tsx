@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useImperativeHandle, forwardRef, useState } from 'react';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { browserDataService } from '../../services/browserData';
+import { PersonalitySelector } from '../Settings/PersonalitySelector';
 
 export interface WebViewHandle {
   goBack: () => void;
@@ -30,6 +31,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
   } = useBrowserStore();
   const { tabs, activeTabId, updateTab } = useTabsStore();
   const webviewRefs = useRef<Record<string, any>>({});
+  const [isPersonalitySelectorOpen, setIsPersonalitySelectorOpen] = useState(false);
 
   // Get active webview
   const getActiveWebview = () => {
@@ -334,8 +336,9 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
   }, [tabs]);
 
   return (
-    <div className="flex-1 relative bg-background">
-      {tabs.map((tab) => {
+    <>
+      <div className="flex-1 relative bg-background">
+        {tabs.map((tab) => {
         const isVisible = tab.id === activeTabId;
         const shouldRenderWebview = !tab.isSuspended;
 
@@ -385,7 +388,7 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
             {/* Welcome Screen Overlay - shown when no URL */}
             {!tab.url && !tab.isSuspended && isVisible && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-background">
-                <div className="space-y-4 max-w-md">
+                <div className="space-y-6 max-w-md">
                   <svg
                     className="w-16 h-16 mx-auto text-muted-foreground"
                     fill="none"
@@ -406,6 +409,19 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                   <p className="text-sm text-muted-foreground">
                     Click the AI button to chat with local models about any page.
                   </p>
+
+                  {/* Personality Selection Button */}
+                  <div className="pt-4">
+                    <button
+                      onClick={() => setIsPersonalitySelectorOpen(true)}
+                      className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-lg"
+                    >
+                      Choose AI Personality
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Customize how your AI assistant talks to you
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -444,7 +460,14 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
           </div>
         );
       })}
-    </div>
+      </div>
+
+      {/* Personality Selector Modal */}
+      <PersonalitySelector
+        isOpen={isPersonalitySelectorOpen}
+        onClose={() => setIsPersonalitySelectorOpen(false)}
+      />
+    </>
   );
 });
 
