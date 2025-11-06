@@ -516,7 +516,7 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(
     'ollama:chat',
-    async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[] }) => {
+    async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[]; think?: boolean }) => {
       try {
         if (!options || typeof options !== 'object') {
           throw new Error('Invalid chat options');
@@ -669,6 +669,7 @@ When Planning Mode is enabled, you have access to these tools:
           stream: true,
           planningMode: options.planningMode,
           tools: options.tools,
+          think: options.think,
         });
 
         for await (const token of generator) {

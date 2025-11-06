@@ -2,11 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { BrowserLayout } from './components/Browser/BrowserLayout';
 import { DownloadManager } from './components/Downloads/DownloadManager';
 import { UserAgreement } from './components/UserAgreement/UserAgreement';
+import { initializeChatSettings } from './store/chat';
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);
   const [agreementAccepted, setAgreementAccepted] = useState<boolean | null>(null);
   const [showAgreement, setShowAgreement] = useState(false);
+
+  // Initialize chat settings (thinking mode, etc.)
+  useEffect(() => {
+    initializeChatSettings();
+  }, []);
 
   // Check if user has accepted the agreement
   useEffect(() => {
