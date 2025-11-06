@@ -132,3 +132,27 @@ export interface ChatOptions {
   messages: ChatMessage[];
   context?: AIContext;
 }
+
+// Personality types
+export interface Personality {
+  id: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  icon: string;
+  tags: string[];
+}
+
+export interface PersonalityCategory {
+  name: string;
+  description: string;
+  personalities: Personality[];
+}
+
+export interface PersonalitiesConfig {
+  version: string;
+  categories: {
+    [key: string]: PersonalityCategory;
+  };
+  defaultPersonality: string;
+}

@@ -204,6 +204,12 @@ class DatabaseService {
       this.setSetting('custom-instructions', '');
     }
 
+    // Initialize default personality if not exists
+    const selectedPersonality = this.getSetting('selected-personality');
+    if (!selectedPersonality) {
+      this.setSetting('selected-personality', 'best-friend');
+    }
+
     // Initialize default download settings if not exists
     const defaultDownloadFolder = this.getSetting('default-download-folder');
     if (!defaultDownloadFolder) {

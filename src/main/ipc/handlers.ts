@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow, webContents, dialog, shell } from 'electron';
 import path from 'path';
-import { databaseService, HistoryEntry, Bookmark, Tab, Download } from '../services/database';
+import fs from 'fs';
+import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
 import {
   validateUrl,
   validatePositiveInteger,
@@ -11,7 +12,33 @@ import { ollamaService } from '../services/ollama';
 import { captureService } from '../services/capture';
 import { downloadService } from '../services/download';
 import { createDownloadManagerWindow } from '../index';
-import type { GenerateOptions, ChatOptions } from '../../shared/types';
+import type {
+  GenerateOptions,
+  ChatOptions,
+  PersonalitiesConfig,
+  Personality,
+} from '../../shared/types';
+
+// Load personalities configuration
+let personalitiesConfig: PersonalitiesConfig | null = null;
+try {
+  const personalitiesPath = path.join(__dirname, '../../shared/personalities/personalities.json');
+  const personalitiesData = fs.readFileSync(personalitiesPath, 'utf-8');
+  personalitiesConfig = JSON.parse(personalitiesData);
+} catch (error) {
+  console.error('Failed to load personalities config:', error);
+}
+
+// Helper function to get personality by id
+function getPersonalityById(personalityId: string): Personality | null {
+  if (!personalitiesConfig) return null;
+
+  for (const category of Object.values(personalitiesConfig.categories)) {
+    const personality = category.personalities.find((p) => p.id === personalityId);
+    if (personality) return personality;
+  }
+  return null;
+}
 
 export function registerIpcHandlers() {
   console.log('registerIpcHandlers called');
@@ -590,6 +617,11 @@ When Planning Mode is enabled, you have access to these tools:
           const userInfo = databaseService.getSetting('user-info') || '';
           const customInstructions = databaseService.getSetting('custom-instructions') || '';
 
+          // Get selected personality
+          const selectedPersonalityId =
+            databaseService.getSetting('selected-personality') || 'best-friend';
+          const selectedPersonality = getPersonalityById(selectedPersonalityId);
+
           // Get current date and time
           const now = new Date();
           const dateTimeInfo = `Current date and time: ${now.toLocaleString('en-US', {
@@ -605,6 +637,11 @@ When Planning Mode is enabled, you have access to these tools:
 
           // Build full system message - start with base prompt
           let fullSystemMessage = `${defaultSystemPrompt}\n\n${dateTimeInfo}`;
+
+          // Add personality prompt if available
+          if (selectedPersonality) {
+            fullSystemMessage += `\n\n## AI Personality\nYou have been given the "${selectedPersonality.name}" personality. Follow these personality guidelines:\n\n${selectedPersonality.systemPrompt}`;
+          }
 
           // Add user customizations at the bottom
           if (userCustomPrompt && userCustomPrompt.trim()) {
@@ -694,14 +731,16 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  ipcMain.handle('tool:analyze_page_content', async (event) => {
+  ipcMain.handle('tool:analyze_page_content', async (_event) => {
     try {
       // Find the active webview (browser tab) instead of the main window
       const allWebContents = webContents.getAllWebContents();
       const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
-        throw new Error('No browser tab is currently open. Please open a webpage first, then try again.');
+        throw new Error(
+          'No browser tab is currently open. Please open a webpage first, then try again.'
+        );
       }
 
       const capture = await captureService.capturePage(webviewContents, {
@@ -721,14 +760,16 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  ipcMain.handle('tool:capture_screenshot', async (event) => {
+  ipcMain.handle('tool:capture_screenshot', async (_event) => {
     try {
       // Find the active webview (browser tab) instead of the main window
       const allWebContents = webContents.getAllWebContents();
       const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
-        throw new Error('No browser tab is currently open. Please open a webpage first, then try again.');
+        throw new Error(
+          'No browser tab is currently open. Please open a webpage first, then try again.'
+        );
       }
 
       const screenshot = await captureService.captureScreenshot(webviewContents);
@@ -810,6 +851,46 @@ When Planning Mode is enabled, you have access to these tools:
       return databaseService.setSetting(key, value);
     } catch (error: any) {
       console.error('settings:set error:', error.message);
+      throw error;
+    }
+  });
+
+  // Personality handlers
+  ipcMain.handle('personalities:getAll', async () => {
+    try {
+      return personalitiesConfig;
+    } catch (error: any) {
+      console.error('personalities:getAll error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('personalities:getCurrent', async () => {
+    try {
+      const selectedPersonalityId =
+        databaseService.getSetting('selected-personality') || 'best-friend';
+      const personality = getPersonalityById(selectedPersonalityId);
+      return personality || null;
+    } catch (error: any) {
+      console.error('personalities:getCurrent error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('personalities:select', async (_event, personalityId: string) => {
+    try {
+      validateString(personalityId, 'Personality ID', 128);
+
+      // Verify the personality exists
+      const personality = getPersonalityById(personalityId);
+      if (!personality) {
+        throw new Error(`Personality not found: ${personalityId}`);
+      }
+
+      databaseService.setSetting('selected-personality', personalityId);
+      return personality;
+    } catch (error: any) {
+      console.error('personalities:select error:', error.message);
       throw error;
     }
   });
