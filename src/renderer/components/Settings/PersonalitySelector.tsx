@@ -35,7 +35,7 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
         // Try to set category based on current personality
         if (current) {
           for (const [categoryKey, category] of Object.entries(config.categories)) {
-            if (category.personalities.some(p => p.id === current.id)) {
+            if (category.personalities.some((p) => p.id === current.id)) {
               setSelectedCategory(categoryKey);
               break;
             }
@@ -62,7 +62,10 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
       <div
         className="bg-background rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -80,12 +83,7 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
             className="text-muted-foreground hover:text-foreground transition-colors"
             title="Close"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -120,9 +118,13 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
                       }`}
                     >
                       <div className="font-medium">{category.name}</div>
-                      <div className={`text-xs mt-1 ${
-                        selectedCategory === key ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                      }`}>
+                      <div
+                        className={`text-xs mt-1 ${
+                          selectedCategory === key
+                            ? 'text-primary-foreground/80'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
                         {category.personalities.length} personalities
                       </div>
                     </button>
@@ -177,7 +179,9 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-xs text-muted-foreground/80">{personality.name}</p>
+                                <p className="text-xs text-muted-foreground/80">
+                                  {personality.name}
+                                </p>
                                 <p className="text-sm text-muted-foreground mt-1">
                                   {personality.description}
                                 </p>
@@ -209,7 +213,9 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
           <div className="text-sm text-muted-foreground">
             {currentPersonality && (
               <span>
-                Currently active: <span className="font-medium text-foreground">{currentPersonality.personName}</span> ({currentPersonality.name})
+                Currently active:{' '}
+                <span className="font-medium text-foreground">{currentPersonality.personName}</span>{' '}
+                ({currentPersonality.name})
               </span>
             )}
           </div>

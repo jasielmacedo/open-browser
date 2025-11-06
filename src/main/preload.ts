@@ -34,6 +34,12 @@ const ALLOWED_INVOKE_CHANNELS = [
   'ollama:generate',
   'ollama:chat',
   'ollama:getStatus',
+  'ollama:restart',
+  'ollama:forceKill',
+  'ollama:stop',
+  'ollama:cancelPull',
+  'ollama:cancelChat',
+  'tabs:wasCrash',
   'tool:search_history',
   'tool:get_bookmarks',
   'tool:analyze_page_content',
@@ -64,6 +70,9 @@ const ALLOWED_INVOKE_CHANNELS = [
   'download:chooseSaveLocation',
   'download:openManager',
   'download:saveImage',
+  'agreement:check',
+  'agreement:accept',
+  'app:quit',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [

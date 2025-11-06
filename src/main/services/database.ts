@@ -616,13 +616,7 @@ class DatabaseService {
   updateDownload(id: number, updates: Partial<Download>): void {
     if (!this.db) throw new Error('Database not initialized');
 
-    const allowedFields = [
-      'received_bytes',
-      'state',
-      'end_time',
-      'error',
-      'total_bytes',
-    ] as const;
+    const allowedFields = ['received_bytes', 'state', 'end_time', 'error', 'total_bytes'] as const;
 
     const fields: string[] = [];
     const values: any[] = [];

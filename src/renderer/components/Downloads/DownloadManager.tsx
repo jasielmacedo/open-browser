@@ -207,7 +207,9 @@ export const DownloadManager: React.FC = () => {
         <button
           onClick={() => setFilter('active')}
           className={`px-4 py-2 rounded transition-colors ${
-            filter === 'active' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
+            filter === 'active'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted hover:bg-muted/80'
           }`}
         >
           Active (
@@ -229,12 +231,7 @@ export const DownloadManager: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4">
         {filteredDownloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <svg
-              className="w-16 h-16 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -247,8 +244,8 @@ export const DownloadManager: React.FC = () => {
               {filter === 'all'
                 ? 'Start downloading files to see them here'
                 : filter === 'active'
-                ? 'No active downloads'
-                : 'No completed downloads'}
+                  ? 'No active downloads'
+                  : 'No completed downloads'}
             </p>
           </div>
         ) : (
@@ -267,12 +264,12 @@ export const DownloadManager: React.FC = () => {
                           download.state === 'completed'
                             ? 'bg-green-500/20 text-green-400'
                             : download.state === 'in_progress'
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : download.state === 'paused'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : download.state === 'failed'
-                            ? 'bg-red-500/20 text-red-400'
-                            : 'bg-gray-500/20 text-gray-400'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : download.state === 'paused'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : download.state === 'failed'
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : 'bg-gray-500/20 text-gray-400'
                         }`}
                       >
                         {download.state}

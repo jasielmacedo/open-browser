@@ -663,20 +663,24 @@ export class OllamaService {
   private async findOllamaPid(): Promise<number | null> {
     return new Promise<number | null>((resolve) => {
       if (process.platform === 'win32') {
-        exec('tasklist /FI "IMAGENAME eq ollama.exe" /FO CSV /NH', { timeout: 3000 }, (error, stdout) => {
-          if (error || !stdout || stdout.includes('INFO: No tasks are running')) {
-            resolve(null);
-            return;
-          }
+        exec(
+          'tasklist /FI "IMAGENAME eq ollama.exe" /FO CSV /NH',
+          { timeout: 3000 },
+          (error, stdout) => {
+            if (error || !stdout || stdout.includes('INFO: No tasks are running')) {
+              resolve(null);
+              return;
+            }
 
-          // Parse the first ollama.exe process found
-          const match = stdout.match(/"ollama\.exe","(\d+)"/);
-          if (match && match[1]) {
-            resolve(parseInt(match[1], 10));
-          } else {
-            resolve(null);
+            // Parse the first ollama.exe process found
+            const match = stdout.match(/"ollama\.exe","(\d+)"/);
+            if (match && match[1]) {
+              resolve(parseInt(match[1], 10));
+            } else {
+              resolve(null);
+            }
           }
-        });
+        );
       } else {
         exec('pgrep -f "ollama"', { timeout: 3000 }, (error, stdout) => {
           if (error || !stdout.trim()) {
@@ -734,7 +738,10 @@ export class OllamaService {
 
             try {
               // Parse CSV output (skip header and node line)
-              const lines = stdout.trim().split('\n').filter(line => line.trim());
+              const lines = stdout
+                .trim()
+                .split('\n')
+                .filter((line) => line.trim());
               if (lines.length < 2) {
                 resolve(null);
                 return;
@@ -747,9 +754,10 @@ export class OllamaService {
                 const workingSetSize = parseInt(parts[3], 10); // Memory in bytes
 
                 // Calculate uptime (0 if we don't have start time)
-                const uptime = this.processStartTime > 0
-                  ? Math.floor((Date.now() - this.processStartTime) / 1000)
-                  : 0;
+                const uptime =
+                  this.processStartTime > 0
+                    ? Math.floor((Date.now() - this.processStartTime) / 1000)
+                    : 0;
 
                 resolve({
                   pid,
@@ -786,9 +794,10 @@ export class OllamaService {
             const rss = parseInt(output[0], 10) * 1024; // Convert KB to bytes
             const cpu = parseFloat(output[1]);
 
-            const uptime = this.processStartTime > 0
-              ? Math.floor((Date.now() - this.processStartTime) / 1000)
-              : 0;
+            const uptime =
+              this.processStartTime > 0
+                ? Math.floor((Date.now() - this.processStartTime) / 1000)
+                : 0;
 
             resolve({
               pid,
@@ -844,7 +853,7 @@ export class OllamaService {
 
     // Wait for stop to complete (isStopping flag will be reset by stop())
     // Add extra delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     // Verify process is fully stopped before starting
     if (this.process) {
@@ -1330,7 +1339,9 @@ export class OllamaService {
 
         // Log periodically to show stream is alive
         if (chunkCount % 100 === 0) {
-          console.log(`[Ollama] Received ${chunkCount} chunks, ${tokenCount} tokens, buffer size: ${buffer.length}`);
+          console.log(
+            `[Ollama] Received ${chunkCount} chunks, ${tokenCount} tokens, buffer size: ${buffer.length}`
+          );
           // Debug: Show buffer content if no tokens are being extracted
           if (tokenCount === 0 && chunkCount >= 100) {
             console.log('[Ollama] DEBUG - Buffer sample:', buffer.substring(0, 200));
@@ -1344,7 +1355,11 @@ export class OllamaService {
             processedSomething = false;
 
             // Strategy 1: Try to parse buffer as complete JSON (for small chunks)
-            if (buffer.length < 500 && buffer.trim().startsWith('{') && buffer.trim().endsWith('}')) {
+            if (
+              buffer.length < 500 &&
+              buffer.trim().startsWith('{') &&
+              buffer.trim().endsWith('}')
+            ) {
               try {
                 const data = JSON.parse(buffer);
                 processedSomething = true;

@@ -679,9 +679,7 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
                   />
                 </svg>
                 <span>AI Reasoning Process</span>
-                <span className="text-[10px] opacity-60">
-                  ({message.thinking.length} chars)
-                </span>
+                <span className="text-[10px] opacity-60">({message.thinking.length} chars)</span>
               </div>
               <svg
                 className={`w-4 h-4 transition-transform ${showThinking ? 'rotate-180' : ''}`}

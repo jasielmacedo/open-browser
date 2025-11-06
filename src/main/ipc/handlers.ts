@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, webContents, dialog, shell } from 'electron';
+import { ipcMain, BrowserWindow, webContents, dialog, shell, app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
@@ -1184,6 +1184,38 @@ When Planning Mode is enabled, you have access to these tools:
       return { success: true, savePath };
     } catch (error: any) {
       console.error('download:saveImage error:', error.message);
+      throw error;
+    }
+  });
+
+  // User agreement handlers
+  ipcMain.handle('agreement:check', async () => {
+    try {
+      const accepted = databaseService.getSetting('user-agreement-accepted');
+      return accepted === 'true';
+    } catch (error: any) {
+      console.error('agreement:check error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('agreement:accept', async () => {
+    try {
+      databaseService.setSetting('user-agreement-accepted', 'true');
+      return { success: true };
+    } catch (error: any) {
+      console.error('agreement:accept error:', error.message);
+      throw error;
+    }
+  });
+
+  // App control handlers
+  ipcMain.handle('app:quit', async () => {
+    try {
+      app.quit();
+      return { success: true };
+    } catch (error: any) {
+      console.error('app:quit error:', error.message);
       throw error;
     }
   });
