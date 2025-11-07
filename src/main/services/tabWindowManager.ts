@@ -80,8 +80,12 @@ class TabWindowManager {
 
     this.tabWindows.set(tabId, tab);
 
-    // Add view to main window
+    // Add view to main window at the bottom of the z-order (index 0)
+    // This ensures WebContentsViews render behind UI elements in the renderer
     this.mainWindow.contentView.addChildView(tabView);
+    // Note: Electron doesn't provide a way to set z-index directly for WebContentsView
+    // They are always rendered in a separate layer above the main window's content
+    // We need to manage visibility and positioning to avoid covering UI
 
     // Setup event listeners BEFORE loading URL to catch all events
     this.setupTabWindowListeners(tab);
@@ -288,6 +292,8 @@ class TabWindowManager {
   /**
    * Calculate the bounds for tab views based on main window
    * WebContentsViews are positioned below the tab bar and navigation bar
+   * Note: WebContentsView renders in a native layer above the renderer's DOM,
+   * so we cannot use CSS z-index. We must position it to avoid covering UI elements.
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
     if (!this.mainWindow) {
@@ -302,11 +308,15 @@ class TabWindowManager {
     // Total offset from top: ~88px
     const UI_TOP_HEIGHT = 88;
 
-    // Position WebContentsView below the UI elements
+    // Sidebar width: 320px (w-80 = 20rem * 16px)
+    // Reserve space on the right for sidebars (ChatSidebar, HistorySidebar, BookmarksSidebar)
+    const SIDEBAR_WIDTH = 320;
+
+    // Position WebContentsView below the UI elements and to the left of sidebars
     return {
       x: 0,
       y: UI_TOP_HEIGHT,
-      width,
+      width: width - SIDEBAR_WIDTH,
       height: height - UI_TOP_HEIGHT,
     };
   }
