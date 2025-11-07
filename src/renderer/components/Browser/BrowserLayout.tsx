@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { NavigationBar } from './NavigationBar';
-import { MultiWebViewContainer, WebViewHandle } from './MultiWebViewContainer';
+import { BrowserWindowContainer, BrowserWindowHandle } from './BrowserWindowContainer';
 import { TabBar } from './TabBar';
 import { ChatSidebar } from '../Chat/ChatSidebar';
 import { HistorySidebar } from './HistorySidebar';
@@ -13,7 +13,7 @@ import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
 
 export const BrowserLayout: React.FC = () => {
-  const webviewRef = useRef<WebViewHandle>(null);
+  const browserWindowRef = useRef<BrowserWindowHandle>(null);
   const { toggleHistory, toggleBookmarks } = useBrowserStore();
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, loadTabs, suspendInactiveTabs } =
     useTabsStore();
@@ -131,51 +131,26 @@ export const BrowserLayout: React.FC = () => {
       // Ctrl/Cmd + R or F5 - Reload
       if (((e.ctrlKey || e.metaKey) && e.key === 'r') || e.key === 'F5') {
         e.preventDefault();
-        webviewRef.current?.reload();
-      }
-      // Ctrl/Cmd + Plus - Zoom in
-      else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
-        e.preventDefault();
-        webviewRef.current?.zoomIn();
-      }
-      // Ctrl/Cmd + Minus - Zoom out
-      else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault();
-        webviewRef.current?.zoomOut();
-      }
-      // Ctrl/Cmd + 0 - Reset zoom
-      else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        webviewRef.current?.resetZoom();
+        browserWindowRef.current?.reload();
       }
       // Alt + Left Arrow - Back
       else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
-        webviewRef.current?.goBack();
+        browserWindowRef.current?.goBack();
       }
       // Alt + Right Arrow - Forward
       else if (e.altKey && e.key === 'ArrowRight') {
         e.preventDefault();
-        webviewRef.current?.goForward();
-      }
-      // Ctrl/Cmd + P - Print
-      else if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-        e.preventDefault();
-        webviewRef.current?.print();
+        browserWindowRef.current?.goForward();
       }
       // Ctrl/Cmd + U - View Page Source
       else if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
         e.preventDefault();
-        webviewRef.current?.viewSource();
-      }
-      // F12 - Developer Tools
-      else if (e.key === 'F12') {
-        e.preventDefault();
-        webviewRef.current?.openDevTools();
+        browserWindowRef.current?.viewSource();
       }
       // Escape - Stop loading
       else if (e.key === 'Escape') {
-        webviewRef.current?.stop();
+        browserWindowRef.current?.stop();
       }
     };
 
@@ -198,12 +173,12 @@ export const BrowserLayout: React.FC = () => {
       <TabBar />
 
       {/* Navigation Bar */}
-      <NavigationBar webviewRef={webviewRef} />
+      <NavigationBar browserWindowRef={browserWindowRef} />
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Multi-Tab WebView Container */}
-        <MultiWebViewContainer ref={webviewRef} />
+        {/* BrowserWindow Container (manages BrowserWindow-based tabs) */}
+        <BrowserWindowContainer ref={browserWindowRef} />
 
         {/* Sidebars (only one visible at a time) */}
         <ChatSidebar />

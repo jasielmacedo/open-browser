@@ -23,7 +23,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   tabs: [],
   activeTabId: null,
 
-  addTab: (url = '') => {
+  addTab: async (url = '') => {
     // Generate a unique ID combining UUID, timestamp, and counter
     const uniqueId = `${crypto.randomUUID()}-${Date.now()}-${++tabCounter}`;
 
@@ -49,14 +49,29 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       activeTabId: newTab.id,
     }));
 
+    // Create the BrowserWindow tab in the main process
+    try {
+      await window.electron.invoke('tabWindow:create', uniqueId, url);
+      await window.electron.invoke('tabWindow:setActive', uniqueId);
+    } catch (error) {
+      console.error('Failed to create tab window:', error);
+    }
+
     // Auto-save after adding tab
     get().saveTabs();
   },
 
-  closeTab: (tabId: string) => {
+  closeTab: async (tabId: string) => {
     const state = get();
     const tabIndex = state.tabs.findIndex((t) => t.id === tabId);
     if (tabIndex === -1) return;
+
+    // Close the BrowserWindow tab in the main process
+    try {
+      await window.electron.invoke('tabWindow:close', tabId);
+    } catch (error) {
+      console.error('Failed to close tab window:', error);
+    }
 
     const newTabs = state.tabs.filter((t) => t.id !== tabId);
 
@@ -88,7 +103,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     get().saveTabs();
   },
 
-  setActiveTab: (tabId: string) => {
+  setActiveTab: async (tabId: string) => {
     set((state) => ({
       tabs: state.tabs.map((tab) => ({
         ...tab,
@@ -98,6 +113,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       })),
       activeTabId: tabId,
     }));
+
+    // Set active tab in the main process
+    try {
+      await window.electron.invoke('tabWindow:setActive', tabId);
+    } catch (error) {
+      console.error('Failed to set active tab:', error);
+    }
 
     // Auto-save after switching tabs
     get().saveTabs();

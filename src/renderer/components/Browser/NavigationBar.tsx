@@ -3,7 +3,7 @@ import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
 import { useChatStore } from '../../store/chat';
-import { WebViewHandle } from './MultiWebViewContainer';
+import { BrowserWindowHandle } from './BrowserWindowContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
 import { SystemPromptSettings } from '../Settings/SystemPromptSettings';
@@ -11,10 +11,10 @@ import { DownloadDropdown } from './DownloadDropdown';
 import { supportsVision } from '../../../shared/modelRegistry';
 
 interface NavigationBarProps {
-  webviewRef: RefObject<WebViewHandle>;
+  browserWindowRef: RefObject<BrowserWindowHandle>;
 }
 
-export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
+export const NavigationBar: React.FC<NavigationBarProps> = ({ browserWindowRef }) => {
   const {
     currentUrl,
     pageTitle,
@@ -46,7 +46,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   const [showSystemPromptSettings, setShowSystemPromptSettings] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [activeDownloadsCount, setActiveDownloadsCount] = useState(0);
-  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadButtonRef = useRef<React.ElementRef<'button'>>(null);
 
   // Sync inputValue with currentUrl when not focused (for tab changes)
   useEffect(() => {
@@ -309,18 +309,18 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   };
 
   const handleBack = () => {
-    webviewRef.current?.goBack();
+    browserWindowRef.current?.goBack();
   };
 
   const handleForward = () => {
-    webviewRef.current?.goForward();
+    browserWindowRef.current?.goForward();
   };
 
   const handleRefresh = () => {
     if (isLoading) {
-      webviewRef.current?.stop();
+      browserWindowRef.current?.stop();
     } else {
-      webviewRef.current?.reload();
+      browserWindowRef.current?.reload();
     }
   };
 
@@ -379,30 +379,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     }
 
     try {
-      // Get selected text
-      const selectedText = await webviewRef.current?.executeJavaScript(
-        'window.getSelection().toString()'
-      );
-
-      if (!selectedText) {
-        alert('Please select some text first');
-        return;
-      }
-
-      // Open chat if not already open
-      if (!isChatOpen) {
-        toggleChat();
-      }
-
-      // Capture page context
-      const pageCapture = await window.electron.invoke('capture:forText');
-
-      // Send to AI with selected text in context
-      const prompt = `Please explain the following text:\n\n"${selectedText}"`;
-      await sendChatMessage(prompt, undefined, {
-        ...pageCapture,
-        selectedText,
-      });
+      // Note: With BrowserWindow tabs, we can't directly execute JavaScript
+      // User should select text and use context menu instead
+      alert('Please select text and use the right-click context menu "Explain this"');
     } catch (error) {
       console.error('Failed to explain selection:', error);
       alert('Failed to explain text. Please try again.');
@@ -526,67 +505,6 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     },
     { label: '', separator: true, onClick: () => {} },
     {
-      label: 'Zoom In',
-      shortcut: 'Ctrl++',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"
-          />
-        </svg>
-      ),
-      onClick: () => webviewRef.current?.zoomIn(),
-    },
-    {
-      label: 'Zoom Out',
-      shortcut: 'Ctrl+-',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
-          />
-        </svg>
-      ),
-      onClick: () => webviewRef.current?.zoomOut(),
-    },
-    {
-      label: 'Reset Zoom',
-      shortcut: 'Ctrl+0',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      ),
-      onClick: () => webviewRef.current?.resetZoom(),
-    },
-    { label: '', separator: true, onClick: () => {} },
-    {
-      label: 'Print...',
-      shortcut: 'Ctrl+P',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-          />
-        </svg>
-      ),
-      onClick: () => webviewRef.current?.print(),
-    },
-    {
       label: 'View Page Source',
       shortcut: 'Ctrl+U',
       icon: (
@@ -599,7 +517,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.viewSource(),
+      onClick: () => browserWindowRef.current?.viewSource(),
       disabled: !hasUrl,
     },
     {
@@ -615,7 +533,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.openDevTools(),
+      onClick: () => browserWindowRef.current?.openDevTools(),
     },
   ];
 
