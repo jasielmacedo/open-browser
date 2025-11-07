@@ -1,5 +1,6 @@
-import React, { useEffect, useImperativeHandle, forwardRef, useState } from 'react';
+import React, { useEffect, useImperativeHandle, forwardRef, useState, useRef } from 'react';
 import { useTabsStore } from '../../store/tabs';
+import { useBrowserStore } from '../../store/browser';
 import { useTabWindowEvents } from '../../hooks/useTabWindowEvents';
 import { PersonalitySelector } from '../Settings/PersonalitySelector';
 import type { Personality } from '../../../shared/types';
@@ -53,11 +54,44 @@ export interface BrowserWindowHandle {
  */
 export const BrowserWindowContainer = forwardRef<BrowserWindowHandle>((props, ref) => {
   const { tabs, activeTabId, addTab } = useTabsStore();
+  const { isChatOpen, showHistory, showBookmarks } = useBrowserStore();
   const [isPersonalitySelectorOpen, setIsPersonalitySelectorOpen] = useState(false);
   const [currentPersonality, setCurrentPersonality] = useState<Personality | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Listen for tab window events from main process
   useTabWindowEvents();
+
+  // Update tab window bounds when container size or sidebar state changes
+  useEffect(() => {
+    const updateBounds = () => {
+      if (!containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const bounds = {
+        x: Math.round(rect.left),
+        y: Math.round(rect.top),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+
+      console.log('[BrowserWindowContainer] Updating bounds:', bounds);
+
+      window.electron.invoke('tabWindow:updateBounds', bounds).catch((error) => {
+        console.error('Failed to update tab window bounds:', error);
+      });
+    };
+
+    // Update immediately
+    updateBounds();
+
+    // Also update on window resize
+    window.addEventListener('resize', updateBounds);
+
+    return () => {
+      window.removeEventListener('resize', updateBounds);
+    };
+  }, [isChatOpen, showHistory, showBookmarks]); // Re-run when sidebars open/close
 
   // Load current personality on mount
   useEffect(() => {
@@ -190,7 +224,7 @@ export const BrowserWindowContainer = forwardRef<BrowserWindowHandle>((props, re
         This container is just for showing the welcome screen when there are no tabs.
         The BrowserWindow tabs are positioned and shown/hidden by TabWindowManager.
       */}
-      <div className="flex-1 relative bg-background">
+      <div ref={containerRef} className="flex-1 relative bg-background">
         {/* Welcome Screen - shown when active tab has no URL */}
         {showWelcomeScreen && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 bg-background">

@@ -25,6 +25,7 @@ class TabWindowManager {
   private tabWindows: Map<string, TabWindow> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private activeTabId: string | null = null;
+  private browserBounds: { x: number; y: number; width: number; height: number } | null = null;
 
   /**
    * Initialize the manager with the main window reference
@@ -292,29 +293,41 @@ class TabWindowManager {
   }
 
   /**
+   * Set the browser content bounds (called from renderer when layout changes)
+   */
+  setBrowserBounds(bounds: { x: number; y: number; width: number; height: number }) {
+    this.browserBounds = bounds;
+    // Update all tab windows with new bounds
+    this.updateAllTabWindowBounds();
+  }
+
+  /**
    * Calculate the bounds for tab windows based on main window
    * Tab windows should fill the content area below the navigation bar
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
+    // If renderer sent us custom bounds, use those
+    if (this.browserBounds) {
+      return this.browserBounds;
+    }
+
+    // Fallback: calculate default bounds
     if (!this.mainWindow) {
       return { x: 0, y: 0, width: 800, height: 600 };
     }
 
-    // const mainBounds = this.mainWindow.getBounds();
-    const mainPosition = this.mainWindow.getPosition();
-
-    // Get the actual content bounds from the main window
-    // This accounts for the window frame and title bar
+    // Get the content bounds which gives us width and height
     const contentBounds = this.mainWindow.getContentBounds();
 
-    // The navigation bar + tab bar + status bar is approximately 120px tall
-    // This is measured from the actual UI layout (TabBar ~40px + NavigationBar ~60px + padding ~20px)
-    // TODO: Make this dynamic by receiving actual measurements from renderer
-    const navBarHeight = 120;
+    // The navigation bar + tab bar is approximately 100px tall
+    // This is measured from the actual UI layout (TabBar ~40px + NavigationBar ~60px)
+    const navBarHeight = 100;
 
+    // Child windows should be positioned relative to parent's content area
+    // x: 0, y: navBarHeight means it starts at the top-left of content area, offset by navbar
     return {
-      x: mainPosition[0],
-      y: mainPosition[1] + navBarHeight,
+      x: 0,
+      y: navBarHeight,
       width: contentBounds.width,
       height: contentBounds.height - navBarHeight,
     };
