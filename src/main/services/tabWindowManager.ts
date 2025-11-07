@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContents } from 'electron';
+import { BrowserWindow, WebContents, WebContentsView } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { databaseService } from './database';
@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export interface TabWindow {
   id: string;
-  window: BrowserWindow;
+  view: WebContentsView;
   url: string;
   title: string;
   favicon: string;
@@ -18,14 +18,14 @@ export interface TabWindow {
 
 /**
  * TabWindowManager
- * Manages BrowserWindow instances for each tab - the Chrome pattern
- * Each tab is a separate BrowserWindow that gets shown/hidden based on active state
+ * Manages WebContentsView instances for each tab - the Chrome pattern
+ * Each tab is a separate WebContentsView that gets shown/hidden based on active state
+ * WebContentsViews are properly embedded within the parent window (not floating)
  */
 class TabWindowManager {
   private tabWindows: Map<string, TabWindow> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private activeTabId: string | null = null;
-  private browserBounds: { x: number; y: number; width: number; height: number } | null = null;
 
   /**
    * Initialize the manager with the main window reference
@@ -48,22 +48,17 @@ class TabWindowManager {
   }
 
   /**
-   * Create a new tab window
+   * Create a new tab view
    */
   createTab(tabId: string, url: string): TabWindow {
     if (!this.mainWindow) {
       throw new Error('TabWindowManager not initialized with main window');
     }
 
-    console.log(`[TabWindowManager] Creating tab window for tab: ${tabId}, URL: ${url}`);
+    console.log(`[TabWindowManager] Creating tab view for tab: ${tabId}, URL: ${url}`);
 
-    // Create a new BrowserWindow for this tab
-    const tabWindow = new BrowserWindow({
-      show: false, // Start hidden
-      parent: this.mainWindow,
-      modal: false,
-      frame: false, // No frame - we'll position it ourselves
-      backgroundColor: '#1a1d24',
+    // Create a new WebContentsView for this tab
+    const tabView = new WebContentsView({
       webPreferences: {
         preload: path.join(__dirname, '../preload.js'),
         nodeIntegration: false,
@@ -71,17 +66,12 @@ class TabWindowManager {
         sandbox: true, // Full sandbox for security
         webSecurity: true,
         allowRunningInsecureContent: false,
-        // No webviewTag needed - this is a real browser window!
       },
     });
 
-    // Prevent the tab window from being independently closeable
-    tabWindow.setClosable(false);
-    tabWindow.setMenuBarVisibility(false);
-
     const tab: TabWindow = {
       id: tabId,
-      window: tabWindow,
+      view: tabView,
       url: url || '',
       title: '',
       favicon: '',
@@ -90,20 +80,26 @@ class TabWindowManager {
 
     this.tabWindows.set(tabId, tab);
 
+    // Add view to main window
+    this.mainWindow.contentView.addChildView(tabView);
+
     // Setup event listeners BEFORE loading URL to catch all events
     this.setupTabWindowListeners(tab);
 
-    // Position the tab window
+    // Position the tab view
     this.updateTabWindowBounds(tabId);
+
+    // Start hidden - setActiveTab will make it visible
+    tabView.setVisible(false);
 
     // Load the URL after everything is set up
     if (url) {
-      tabWindow.loadURL(url).catch((err) => {
+      tabView.webContents.loadURL(url).catch((err) => {
         console.error(`[TabWindowManager] Failed to load URL in tab ${tabId}:`, err);
       });
     }
 
-    console.log(`[TabWindowManager] Tab window created: ${tabId}`);
+    console.log(`[TabWindowManager] Tab view created: ${tabId}`);
     return tab;
   }
 
@@ -134,11 +130,10 @@ class TabWindowManager {
   }
 
   /**
-   * Setup event listeners for a tab window
+   * Setup event listeners for a tab view
    */
   private setupTabWindowListeners(tab: TabWindow) {
-    const { window: tabWindow } = tab;
-    const webContents = tabWindow.webContents;
+    const webContents = tab.view.webContents;
 
     // Page title updated
     webContents.on('page-title-updated', (event, title) => {
@@ -235,9 +230,7 @@ class TabWindowManager {
       if (details.reason === 'killed' || details.reason === 'crashed') {
         console.log(`[TabWindowManager] Attempting to reload crashed tab ${tab.id}`);
         setTimeout(() => {
-          if (!tabWindow.isDestroyed()) {
-            tabWindow.reload();
-          }
+          webContents.reload();
         }, 1000);
       }
     });
@@ -293,17 +286,8 @@ class TabWindowManager {
   }
 
   /**
-   * Set the browser content bounds (called from renderer when layout changes)
-   */
-  setBrowserBounds(bounds: { x: number; y: number; width: number; height: number }) {
-    this.browserBounds = bounds;
-    // Update all tab windows with new bounds
-    this.updateAllTabWindowBounds();
-  }
-
-  /**
-   * Calculate the bounds for tab windows based on main window
-   * Tab windows fill the ENTIRE content area - UI overlays on top
+   * Calculate the bounds for tab views based on main window
+   * WebContentsViews fill the ENTIRE content area - UI overlays on top
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
     if (!this.mainWindow) {
@@ -311,41 +295,41 @@ class TabWindowManager {
     }
 
     // Get the full content bounds
-    const contentBounds = this.mainWindow.getContentBounds();
+    const [width, height] = this.mainWindow.getSize();
 
-    // BrowserWindows fill the entire content area (0, 0, full width, full height)
+    // WebContentsViews fill the entire content area (0, 0, full width, full height)
     // The UI (navbar, sidebars) will overlay on top using pointer-events CSS
     return {
       x: 0,
       y: 0,
-      width: contentBounds.width,
-      height: contentBounds.height,
+      width,
+      height,
     };
   }
 
   /**
-   * Update a specific tab window's bounds
+   * Update a specific tab view's bounds
    */
   private updateTabWindowBounds(tabId: string) {
     const tab = this.tabWindows.get(tabId);
     if (!tab) return;
 
     const bounds = this.getTabWindowBounds();
-    tab.window.setBounds(bounds);
+    tab.view.setBounds(bounds);
   }
 
   /**
-   * Update all tab window bounds (called on main window resize/move)
+   * Update all tab view bounds (called on main window resize/move)
    */
   private updateAllTabWindowBounds() {
     const bounds = this.getTabWindowBounds();
     this.tabWindows.forEach((tab) => {
-      tab.window.setBounds(bounds);
+      tab.view.setBounds(bounds);
     });
   }
 
   /**
-   * Switch to a different tab (show/hide windows)
+   * Switch to a different tab (show/hide views)
    */
   setActiveTab(tabId: string) {
     console.log(`[TabWindowManager] Switching to tab: ${tabId}`);
@@ -355,7 +339,7 @@ class TabWindowManager {
       const currentTab = this.tabWindows.get(this.activeTabId);
       if (currentTab) {
         currentTab.isActive = false;
-        currentTab.window.hide();
+        currentTab.view.setVisible(false);
       }
     }
 
@@ -364,8 +348,7 @@ class TabWindowManager {
     if (newTab) {
       newTab.isActive = true;
       this.updateTabWindowBounds(tabId); // Ensure correct position
-      newTab.window.show();
-      newTab.window.focus();
+      newTab.view.setVisible(true);
       this.activeTabId = tabId;
 
       // Notify main window about active tab change
@@ -373,25 +356,25 @@ class TabWindowManager {
         tabId,
         url: newTab.url,
         title: newTab.title,
-        canGoBack: newTab.window.webContents.canGoBack(),
-        canGoForward: newTab.window.webContents.canGoForward(),
+        canGoBack: newTab.view.webContents.canGoBack(),
+        canGoForward: newTab.view.webContents.canGoForward(),
       });
     }
   }
 
   /**
-   * Close a tab window
+   * Close a tab view
    */
   closeTab(tabId: string) {
     console.log(`[TabWindowManager] Closing tab: ${tabId}`);
     const tab = this.tabWindows.get(tabId);
-    if (!tab) return;
+    if (!tab || !this.mainWindow) return;
 
     // If this was the active tab, we need to activate another one
     const wasActive = tab.isActive;
 
-    // Destroy the window
-    tab.window.destroy();
+    // Remove view from main window
+    this.mainWindow.contentView.removeChildView(tab.view);
     this.tabWindows.delete(tabId);
 
     // If this was the active tab, activate another one
@@ -411,7 +394,7 @@ class TabWindowManager {
     if (!tab) return;
 
     console.log(`[TabWindowManager] Navigating tab ${tabId} to: ${url}`);
-    tab.window.loadURL(url).catch((err) => {
+    tab.view.webContents.loadURL(url).catch((err) => {
       console.error(`[TabWindowManager] Failed to navigate tab ${tabId}:`, err);
     });
   }
@@ -421,29 +404,29 @@ class TabWindowManager {
    */
   goBack(tabId: string) {
     const tab = this.tabWindows.get(tabId);
-    if (tab && tab.window.webContents.canGoBack()) {
-      tab.window.webContents.goBack();
+    if (tab && tab.view.webContents.canGoBack()) {
+      tab.view.webContents.goBack();
     }
   }
 
   goForward(tabId: string) {
     const tab = this.tabWindows.get(tabId);
-    if (tab && tab.window.webContents.canGoForward()) {
-      tab.window.webContents.goForward();
+    if (tab && tab.view.webContents.canGoForward()) {
+      tab.view.webContents.goForward();
     }
   }
 
   reload(tabId: string) {
     const tab = this.tabWindows.get(tabId);
     if (tab) {
-      tab.window.webContents.reload();
+      tab.view.webContents.reload();
     }
   }
 
   stop(tabId: string) {
     const tab = this.tabWindows.get(tabId);
     if (tab) {
-      tab.window.webContents.stop();
+      tab.view.webContents.stop();
     }
   }
 
@@ -452,7 +435,7 @@ class TabWindowManager {
    */
   getTabWebContents(tabId: string): WebContents | null {
     const tab = this.tabWindows.get(tabId);
-    return tab ? tab.window.webContents : null;
+    return tab ? tab.view.webContents : null;
   }
 
   /**
@@ -486,15 +469,15 @@ class TabWindowManager {
   }
 
   /**
-   * Cleanup all tab windows
+   * Cleanup all tab views
    */
   cleanup() {
-    console.log('[TabWindowManager] Cleaning up all tab windows');
-    this.tabWindows.forEach((tab) => {
-      if (!tab.window.isDestroyed()) {
-        tab.window.destroy();
-      }
-    });
+    console.log('[TabWindowManager] Cleaning up all tab views');
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.tabWindows.forEach((tab) => {
+        this.mainWindow!.contentView.removeChildView(tab.view);
+      });
+    }
     this.tabWindows.clear();
     this.activeTabId = null;
   }

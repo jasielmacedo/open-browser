@@ -47,8 +47,8 @@ export interface BrowserWindowHandle {
 
 /**
  * BrowserWindowContainer
- * This component manages the browser content area for BrowserWindow-based tabs.
- * Unlike WebView, the actual browser windows are managed in the main process.
+ * This component manages the browser content area for WebContentsView-based tabs.
+ * Unlike WebView, the actual browser views are managed in the main process.
  * This component only handles the UI overlay when there are no tabs.
  */
 export const BrowserWindowContainer = forwardRef<BrowserWindowHandle>((props, ref) => {
@@ -186,9 +186,9 @@ export const BrowserWindowContainer = forwardRef<BrowserWindowHandle>((props, re
   return (
     <>
       {/*
-        The actual browser windows fill the entire main window.
+        The actual browser views fill the entire main window.
         This container is just for showing the welcome screen when there are no tabs.
-        The BrowserWindow tabs are positioned and shown/hidden by TabWindowManager.
+        The WebContentsView tabs are positioned and shown/hidden by TabWindowManager.
       */}
       <div className="flex-1 relative pointer-events-auto">
         {/* Welcome Screen - shown when active tab has no URL */}

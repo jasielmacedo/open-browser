@@ -1354,20 +1354,6 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  // Update browser content bounds (called when layout changes, e.g., sidebar opens/closes)
-  ipcMain.handle(
-    'tabWindow:updateBounds',
-    async (_event, bounds: { x: number; y: number; width: number; height: number }) => {
-      try {
-        tabWindowManager.setBrowserBounds(bounds);
-        return { success: true };
-      } catch (error: any) {
-        console.error('tabWindow:updateBounds error:', error.message);
-        throw error;
-      }
-    }
-  );
-
   ipcMain.handle('tabWindow:getInfo', async (_event, tabId: string) => {
     try {
       validateString(tabId, 'Tab ID', 256);
