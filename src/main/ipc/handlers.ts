@@ -1407,14 +1407,35 @@ When Planning Mode is enabled, you have access to these tools:
   });
 
   // Zoom handlers
-  ipcMain.handle('tabWindow:zoomIn', async (_event, tabId: string) => {
+  ipcMain.handle('tabWindow:zoomIn', async (event, tabId: string) => {
     try {
       validateString(tabId, 'Tab ID', 256);
       const webContents = tabWindowManager.getTabWebContents(tabId);
       if (webContents) {
         const currentZoom = webContents.getZoomLevel();
-        webContents.setZoomLevel(currentZoom + 0.5);
-        return { success: true, zoomLevel: currentZoom + 0.5 };
+        const newZoom = currentZoom + 0.5;
+        webContents.setZoomLevel(newZoom);
+
+        // Save zoom level per-origin (like Chrome)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, newZoom);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: newZoom,
+            zoomFactor: webContents.getZoomFactor(),
+          });
+        }
+
+        return { success: true, zoomLevel: newZoom };
       }
       throw new Error(`Tab not found: ${tabId}`);
     } catch (error: any) {
@@ -1423,14 +1444,35 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  ipcMain.handle('tabWindow:zoomOut', async (_event, tabId: string) => {
+  ipcMain.handle('tabWindow:zoomOut', async (event, tabId: string) => {
     try {
       validateString(tabId, 'Tab ID', 256);
       const webContents = tabWindowManager.getTabWebContents(tabId);
       if (webContents) {
         const currentZoom = webContents.getZoomLevel();
-        webContents.setZoomLevel(currentZoom - 0.5);
-        return { success: true, zoomLevel: currentZoom - 0.5 };
+        const newZoom = currentZoom - 0.5;
+        webContents.setZoomLevel(newZoom);
+
+        // Save zoom level per-origin (like Chrome)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, newZoom);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: newZoom,
+            zoomFactor: webContents.getZoomFactor(),
+          });
+        }
+
+        return { success: true, zoomLevel: newZoom };
       }
       throw new Error(`Tab not found: ${tabId}`);
     } catch (error: any) {
@@ -1439,12 +1481,32 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  ipcMain.handle('tabWindow:resetZoom', async (_event, tabId: string) => {
+  ipcMain.handle('tabWindow:resetZoom', async (event, tabId: string) => {
     try {
       validateString(tabId, 'Tab ID', 256);
       const webContents = tabWindowManager.getTabWebContents(tabId);
       if (webContents) {
         webContents.setZoomLevel(0);
+
+        // Save zoom level per-origin (like Chrome) - reset to 0 (100%)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, 0);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: 0,
+            zoomFactor: 1.0,
+          });
+        }
+
         return { success: true, zoomLevel: 0 };
       }
       throw new Error(`Tab not found: ${tabId}`);

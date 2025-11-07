@@ -185,6 +185,17 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_downloads_state ON downloads(state);
     `);
 
+    // Zoom preferences table (per-domain zoom levels like Chrome)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS zoom_preferences (
+        origin TEXT PRIMARY KEY,
+        zoom_level REAL NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_zoom_updated ON zoom_preferences(updated_at DESC);
+    `);
+
     // Initialize default system prompt if not exists
     const systemPrompt = this.getSetting('system-prompt');
     if (!systemPrompt) {
@@ -711,6 +722,43 @@ class DatabaseService {
     } else {
       this.db.prepare('DELETE FROM downloads WHERE state != "in_progress"').run();
     }
+  }
+
+  // Zoom preferences operations (per-origin like Chrome)
+  getZoomLevel(origin: string): number | null {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = this.db
+      .prepare('SELECT zoom_level FROM zoom_preferences WHERE origin = ?')
+      .get(origin) as { zoom_level: number } | undefined;
+
+    return result ? result.zoom_level : null;
+  }
+
+  setZoomLevel(origin: string, zoomLevel: number): void {
+    if (!this.db) throw new Error('Database not initialized');
+
+    this.db
+      .prepare(
+        `
+      INSERT INTO zoom_preferences (origin, zoom_level, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(origin) DO UPDATE SET
+        zoom_level = excluded.zoom_level,
+        updated_at = excluded.updated_at
+    `
+      )
+      .run(origin, zoomLevel, Date.now());
+  }
+
+  deleteZoomLevel(origin: string): void {
+    if (!this.db) throw new Error('Database not initialized');
+    this.db.prepare('DELETE FROM zoom_preferences WHERE origin = ?').run(origin);
+  }
+
+  clearZoomPreferences(): void {
+    if (!this.db) throw new Error('Database not initialized');
+    this.db.prepare('DELETE FROM zoom_preferences').run();
   }
 
   close() {

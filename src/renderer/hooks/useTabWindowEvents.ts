@@ -8,8 +8,15 @@ import { useBrowserStore } from '../store/browser';
  */
 export function useTabWindowEvents() {
   const { updateTab } = useTabsStore();
-  const { setIsLoading, setCanGoBack, setCanGoForward, setCurrentUrl, setPageTitle, setFavicon } =
-    useBrowserStore();
+  const {
+    setIsLoading,
+    setCanGoBack,
+    setCanGoForward,
+    setCurrentUrl,
+    setPageTitle,
+    setFavicon,
+    setZoomLevel,
+  } = useBrowserStore();
 
   useEffect(() => {
     // Title updated
@@ -142,6 +149,19 @@ export function useTabWindowEvents() {
       }
     );
 
+    // Zoom level changed
+    const unsubZoomChanged = window.electron.on(
+      'tab-zoom-changed',
+      ({ tabId, zoomFactor }: { tabId: string; zoomLevel: number; zoomFactor: number }) => {
+        const activeTabId = useTabsStore.getState().activeTabId;
+        if (tabId === activeTabId) {
+          // Convert zoom factor to percentage (1.0 = 100%, 1.5 = 150%)
+          const percentage = Math.round(zoomFactor * 100);
+          setZoomLevel(percentage);
+        }
+      }
+    );
+
     // Cleanup
     return () => {
       unsubTitleUpdated();
@@ -153,6 +173,7 @@ export function useTabWindowEvents() {
       unsubRequestNew();
       unsubLoadError();
       unsubActivated();
+      unsubZoomChanged();
     };
   }, [
     updateTab,
@@ -162,5 +183,6 @@ export function useTabWindowEvents() {
     setCurrentUrl,
     setPageTitle,
     setFavicon,
+    setZoomLevel,
   ]);
 }

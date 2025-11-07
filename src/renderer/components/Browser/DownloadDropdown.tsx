@@ -15,7 +15,7 @@ export interface Download {
 interface DownloadDropdownProps {
   isOpen: boolean;
   onClose: () => void;
-  anchorRef: React.RefObject<HTMLButtonElement>;
+  anchorRef: React.RefObject<React.ElementRef<'button'>>;
 }
 
 export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({

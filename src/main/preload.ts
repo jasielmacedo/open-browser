@@ -117,6 +117,7 @@ const ALLOWED_LISTEN_CHANNELS = [
   'tab-responsive',
   'tab-certificate-error',
   'tab-context-menu',
+  'tab-zoom-changed',
 ];
 
 // Expose protected methods that allow the renderer process to use

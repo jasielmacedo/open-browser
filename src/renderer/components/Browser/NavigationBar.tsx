@@ -25,6 +25,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ browserWindowRef }
     canGoForward,
     isChatOpen,
     isBookmarked,
+    zoomLevel,
     setCurrentUrl,
     setIsBookmarked,
     toggleChat,
@@ -788,6 +789,24 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ browserWindowRef }
             </div>
           )}
         </div>
+
+        {/* Zoom Indicator - only show when zoom is not 100% */}
+        {zoomLevel !== 100 && (
+          <div
+            className="flex items-center gap-1 px-2 py-1 bg-accent rounded text-xs font-medium text-foreground"
+            title="Current page zoom level"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <span>{zoomLevel}%</span>
+          </div>
+        )}
 
         {/* Bookmark Toggle Button */}
         <button

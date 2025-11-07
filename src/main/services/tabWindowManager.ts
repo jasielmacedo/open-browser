@@ -1,6 +1,7 @@
 import { BrowserWindow, WebContents } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { databaseService } from './database';
 
 // Polyfill __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -106,6 +107,32 @@ class TabWindowManager {
   }
 
   /**
+   * Extract origin from URL (protocol + hostname + port) for per-domain zoom
+   */
+  private getOrigin(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.origin;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Restore saved zoom level for a URL's origin
+   */
+  private restoreZoomLevel(webContents: WebContents, url: string) {
+    const origin = this.getOrigin(url);
+    if (!origin) return;
+
+    const savedZoom = databaseService.getZoomLevel(origin);
+    if (savedZoom !== null) {
+      console.log(`[TabWindowManager] Restoring zoom level ${savedZoom} for ${origin}`);
+      webContents.setZoomLevel(savedZoom);
+    }
+  }
+
+  /**
    * Setup event listeners for a tab window
    */
   private setupTabWindowListeners(tab: TabWindow) {
@@ -149,6 +176,10 @@ class TabWindowManager {
 
     webContents.on('did-navigate', (event, url) => {
       tab.url = url;
+
+      // Restore saved zoom level for this origin
+      this.restoreZoomLevel(webContents, url);
+
       this.notifyMainWindow('tab-did-navigate', {
         tabId: tab.id,
         url,
@@ -159,6 +190,8 @@ class TabWindowManager {
 
     webContents.on('did-navigate-in-page', (event, url) => {
       tab.url = url;
+
+      // In-page navigation (hash changes) keeps same origin, no zoom change needed
       this.notifyMainWindow('tab-did-navigate-in-page', {
         tabId: tab.id,
         url,
