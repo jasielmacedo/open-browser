@@ -287,23 +287,27 @@ class TabWindowManager {
 
   /**
    * Calculate the bounds for tab views based on main window
-   * WebContentsViews fill the ENTIRE content area - UI overlays on top
+   * WebContentsViews are positioned below the tab bar and navigation bar
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
     if (!this.mainWindow) {
       return { x: 0, y: 0, width: 800, height: 600 };
     }
 
-    // Get the full content bounds
+    // Get the full window size
     const [width, height] = this.mainWindow.getSize();
 
-    // WebContentsViews fill the entire content area (0, 0, full width, full height)
-    // The UI (navbar, sidebars) will overlay on top using pointer-events CSS
+    // TabBar height: ~40px (py-2 with border)
+    // NavigationBar height: ~48px (typical navbar height)
+    // Total offset from top: ~88px
+    const UI_TOP_HEIGHT = 88;
+
+    // Position WebContentsView below the UI elements
     return {
       x: 0,
-      y: 0,
+      y: UI_TOP_HEIGHT,
       width,
-      height,
+      height: height - UI_TOP_HEIGHT,
     };
   }
 
