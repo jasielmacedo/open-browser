@@ -180,6 +180,11 @@ class TabWindowManager {
       // Restore saved zoom level for this origin
       this.restoreZoomLevel(webContents, url);
 
+      // Show the view now that it has content
+      if (tab.isActive && url && url.trim() !== '') {
+        tab.view.setVisible(true);
+      }
+
       this.notifyMainWindow('tab-did-navigate', {
         tabId: tab.id,
         url,
@@ -362,7 +367,15 @@ class TabWindowManager {
     if (newTab) {
       newTab.isActive = true;
       this.updateTabWindowBounds(tabId); // Ensure correct position
-      newTab.view.setVisible(true);
+
+      // Only show the view if it has a URL loaded
+      // Empty tabs (welcome screen) should not show the WebContentsView to avoid blocking UI
+      if (newTab.url && newTab.url.trim() !== '') {
+        newTab.view.setVisible(true);
+      } else {
+        newTab.view.setVisible(false);
+      }
+
       this.activeTabId = tabId;
 
       // Notify main window about active tab change
