@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { NavigationBar } from './NavigationBar';
 import { MultiWebViewContainer, WebViewHandle } from './MultiWebViewContainer';
 import { TabBar } from './TabBar';
@@ -7,6 +7,7 @@ import { HistorySidebar } from './HistorySidebar';
 import { BookmarksSidebar } from './BookmarksSidebar';
 import { ModelManager } from '../Models/ModelManager';
 import { DownloadStatusBar } from '../Downloads/DownloadStatusBar';
+import { DownloadToast } from './DownloadToast';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
@@ -17,6 +18,8 @@ export const BrowserLayout: React.FC = () => {
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, loadTabs, suspendInactiveTabs } =
     useTabsStore();
   const { setIsModelManagerOpen } = useModelStore();
+  const [downloadNotification, setDownloadNotification] = useState<string | null>(null);
+  const [previousDownloadsCount, setPreviousDownloadsCount] = useState(0);
 
   // Load tabs on mount
   useEffect(() => {
@@ -31,6 +34,35 @@ export const BrowserLayout: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [suspendInactiveTabs]);
+
+  // Monitor for new downloads and show notification
+  useEffect(() => {
+    const checkForNewDownloads = async () => {
+      try {
+        const downloads = await window.electron.invoke('download:getAll', 100, 0);
+        const currentCount = downloads.length;
+
+        // If we have a new download, show notification
+        if (currentCount > previousDownloadsCount && previousDownloadsCount > 0) {
+          const latestDownload = downloads[0]; // Most recent download
+          if (latestDownload && latestDownload.filename) {
+            setDownloadNotification(latestDownload.filename);
+          }
+        }
+
+        setPreviousDownloadsCount(currentCount);
+      } catch (error) {
+        console.error('Failed to check for new downloads:', error);
+      }
+    };
+
+    // Check immediately on mount
+    checkForNewDownloads();
+
+    // Poll every 3 seconds (less aggressive)
+    const interval = setInterval(checkForNewDownloads, 3000);
+    return () => clearInterval(interval);
+  }, [previousDownloadsCount]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -184,6 +216,14 @@ export const BrowserLayout: React.FC = () => {
 
       {/* Download Status Bar */}
       <DownloadStatusBar />
+
+      {/* Download Notification Toast */}
+      {downloadNotification && (
+        <DownloadToast
+          filename={downloadNotification}
+          onClose={() => setDownloadNotification(null)}
+        />
+      )}
     </div>
   );
 };

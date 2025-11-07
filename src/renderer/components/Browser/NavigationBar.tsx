@@ -1,4 +1,4 @@
-import React, { useState, KeyboardEvent, RefObject, useEffect } from 'react';
+import React, { useState, KeyboardEvent, RefObject, useEffect, useRef } from 'react';
 import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
@@ -7,6 +7,7 @@ import { WebViewHandle } from './MultiWebViewContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
 import { SystemPromptSettings } from '../Settings/SystemPromptSettings';
+import { DownloadDropdown } from './DownloadDropdown';
 import { supportsVision } from '../../../shared/modelRegistry';
 
 interface NavigationBarProps {
@@ -43,6 +44,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [showSystemPromptSettings, setShowSystemPromptSettings] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [activeDownloadsCount, setActiveDownloadsCount] = useState(0);
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
 
   // Sync inputValue with currentUrl when not focused (for tab changes)
   useEffect(() => {
@@ -62,6 +66,26 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       setIsBookmarked(false);
     }
   }, [currentUrl, setIsBookmarked]);
+
+  // Poll for active downloads count
+  useEffect(() => {
+    const checkActiveDownloads = async () => {
+      try {
+        const downloads = await window.electron.invoke('download:getAll', 100, 0);
+        const activeCount = downloads.filter((d: any) => d.state === 'in_progress').length;
+        setActiveDownloadsCount(activeCount);
+      } catch (error) {
+        console.error('Failed to check active downloads:', error);
+      }
+    };
+
+    // Check immediately
+    checkActiveDownloads();
+
+    // Poll every 5 seconds (less aggressive)
+    const interval = setInterval(checkActiveDownloads, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Listen for AI context menu actions from webview
   useEffect(() => {
@@ -841,6 +865,30 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           </svg>
         </button>
 
+        {/* Download Button */}
+        <button
+          ref={downloadButtonRef}
+          onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+          className={`p-2 rounded hover:bg-accent transition-colors relative ${
+            activeDownloadsCount > 0 ? 'text-primary' : ''
+          }`}
+          title="Downloads"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+            />
+          </svg>
+          {activeDownloadsCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+              {activeDownloadsCount}
+            </span>
+          )}
+        </button>
+
         {/* Model Manager Button */}
         <button
           onClick={() => setIsModelManagerOpen(true)}
@@ -917,6 +965,13 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
       <SystemPromptSettings
         isOpen={showSystemPromptSettings}
         onClose={() => setShowSystemPromptSettings(false)}
+      />
+
+      {/* Download Dropdown */}
+      <DownloadDropdown
+        isOpen={showDownloadDropdown}
+        onClose={() => setShowDownloadDropdown(false)}
+        anchorRef={downloadButtonRef}
       />
     </div>
   );

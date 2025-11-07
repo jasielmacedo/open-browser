@@ -37,7 +37,15 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
       setUserInfo(info || '');
       setCustomInstructions(instructions || '');
       setCurrentPersonality(personality);
-      setThinkingMode(thinking !== false); // Default to true if not set
+
+      // Parse thinking mode - handle both string and boolean for backwards compatibility
+      if (thinking === null || thinking === undefined) {
+        setThinkingMode(true); // Default to true if not set
+      } else if (typeof thinking === 'string') {
+        setThinkingMode(thinking !== 'false' && thinking !== '0');
+      } else {
+        setThinkingMode(thinking !== false);
+      }
     } catch (error) {
       console.error('Failed to load settings:', error);
     }

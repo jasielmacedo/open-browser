@@ -1210,8 +1210,11 @@ export class OllamaService {
    */
   async *chat(
     request: ChatRequest
-  ): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] }> {
+  ): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] } | { type: 'thinking'; content: string }> {
     await this.ensureRunning();
+
+    // Track if thinking mode is enabled
+    const thinkingEnabled = request.think === true;
 
     try {
       let messages = [...request.messages];
@@ -1375,8 +1378,8 @@ export class OllamaService {
                   yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
                 }
 
-                // Qwen sends 'thinking' field (internal reasoning) - yield it separately from content
-                if (data.message?.thinking) {
+                // Qwen sends 'thinking' field (internal reasoning) - only yield if thinking mode is enabled
+                if (data.message?.thinking && thinkingEnabled) {
                   yield { type: 'thinking', content: data.message.thinking };
                 }
 
@@ -1414,8 +1417,8 @@ export class OllamaService {
                         yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
                       }
 
-                      // Yield thinking separately from content
-                      if (data.message?.thinking) {
+                      // Yield thinking separately from content - only if thinking mode is enabled
+                      if (data.message?.thinking && thinkingEnabled) {
                         yield { type: 'thinking', content: data.message.thinking };
                       }
 
@@ -1454,8 +1457,8 @@ export class OllamaService {
                       yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
                     }
 
-                    // Yield thinking separately from content
-                    if (data.message?.thinking) {
+                    // Yield thinking separately from content - only if thinking mode is enabled
+                    if (data.message?.thinking && thinkingEnabled) {
                       yield { type: 'thinking', content: data.message.thinking };
                     }
 
@@ -1493,8 +1496,8 @@ export class OllamaService {
                     yield { type: 'tool_calls', tool_calls: data.message.tool_calls };
                   }
 
-                  // Yield thinking separately from content
-                  if (data.message?.thinking) {
+                  // Yield thinking separately from content - only if thinking mode is enabled
+                  if (data.message?.thinking && thinkingEnabled) {
                     yield { type: 'thinking', content: data.message.thinking };
                   }
 

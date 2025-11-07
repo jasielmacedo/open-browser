@@ -67,7 +67,15 @@ interface ChatState {
 const initializeThinkingMode = async (): Promise<boolean> => {
   try {
     const thinkingMode = await window.electron.invoke('settings:get', 'thinking-mode');
-    return thinkingMode !== false; // Default to true if not set
+    // Parse string to boolean - default to true if not set or null
+    if (thinkingMode === null || thinkingMode === undefined) {
+      return true;
+    }
+    // Handle both string and boolean values for backwards compatibility
+    if (typeof thinkingMode === 'string') {
+      return thinkingMode !== 'false' && thinkingMode !== '0';
+    }
+    return thinkingMode !== false;
   } catch (error) {
     console.error('Failed to load thinking mode setting:', error);
     return true; // Default to true on error

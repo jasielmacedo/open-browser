@@ -248,7 +248,10 @@ app.whenReady().then(async () => {
   }
 
   // Setup download handling with the download service
-  session.defaultSession.on('will-download', (_event, item, webContents) => {
+  // Handler function for downloads
+  const handleDownload = (_event: any, item: any, webContents: any) => {
+    console.log('[Download] Download started:', item.getFilename(), 'from', item.getURL());
+
     // Check if there's a custom save path for this URL (e.g., from Save Image As)
     const customPath = downloadService.getCustomSavePath(item.getURL());
 
@@ -263,8 +266,37 @@ app.whenReady().then(async () => {
       savePath = downloadService.getUniqueFilename(downloadFolder, filename);
     }
 
+    console.log('[Download] Saving to:', savePath);
+
     // Handle the download with the service
     downloadService.handleDownload(item, savePath, webContents);
+  };
+
+  // Setup download handler for default session
+  session.defaultSession.on('will-download', handleDownload);
+
+  // Setup download handler for webview partition (persist:main)
+  // Webviews use a separate session partition, so we need to attach the handler there too
+  const webviewSession = session.fromPartition('persist:main');
+
+  console.log('[Main] Setting up download handler for webview session');
+  webviewSession.on('will-download', (event, item, webContents) => {
+    console.log('[Download] will-download event fired for webview!');
+    handleDownload(event, item, webContents);
+  });
+
+  // Set permissions for webview session to allow downloads
+  webviewSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    console.log('[Webview] Permission requested:', permission);
+    // Allow all permissions for now (downloads, media, notifications, etc.)
+    callback(true);
+  });
+
+  // Also log when webContents are created to verify webviews are using the right session
+  app.on('web-contents-created', (event, contents) => {
+    if (contents.getType() === 'webview') {
+      console.log('[Webview] Webview created, partition:', contents.session.toString());
+    }
   });
 
   createWindow();
@@ -491,6 +523,40 @@ app.on('web-contents-created', (event, contents) => {
               // Copy image to clipboard - this will copy the image URL for now
               // In a full implementation, you'd fetch and copy the actual image data
               contents.copyImageAt(params.x, params.y);
+            },
+          })
+        );
+
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // Download Link for link URLs
+      if (params.linkURL && params.linkURL.trim().length > 0) {
+        menu.append(
+          new MenuItem({
+            label: 'Download Link',
+            click: async () => {
+              try {
+                const linkUrl = params.linkURL;
+                console.log('[Context Menu] Download Link clicked for:', linkUrl);
+                const suggestedName = path.basename(new URL(linkUrl).pathname) || 'download';
+                console.log('[Context Menu] Suggested filename:', suggestedName);
+                const savePath = await downloadService.chooseSaveLocation(
+                  mainWindow,
+                  suggestedName
+                );
+                console.log('[Context Menu] User selected save path:', savePath);
+                if (savePath) {
+                  console.log('[Context Menu] Registering custom save path and triggering download');
+                  // Register the custom save path for this URL
+                  downloadService.setCustomSavePath(linkUrl, savePath);
+                  // Trigger download - will use the custom path
+                  contents.downloadURL(linkUrl);
+                  console.log('[Context Menu] downloadURL() called');
+                }
+              } catch (error) {
+                console.error('[Context Menu] Failed to download link:', error);
+              }
             },
           })
         );

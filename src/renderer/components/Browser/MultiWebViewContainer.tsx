@@ -3,6 +3,35 @@ import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { browserDataService } from '../../services/browserData';
 import { PersonalitySelector } from '../Settings/PersonalitySelector';
+import type { Personality } from '../../../shared/types';
+
+// Helper function to get emoji for icon names
+function getIconEmoji(iconName: string): string {
+  const iconMap: Record<string, string> = {
+    briefcase: '💼',
+    code: '💻',
+    target: '🎯',
+    calendar: '📅',
+    book: '📚',
+    users: '👥',
+    'book-open': '📖',
+    zap: '⚡',
+    palette: '🎨',
+    gamepad: '🎮',
+    smile: '😄',
+    'message-circle': '💬',
+    image: '🖼️',
+    coffee: '☕',
+    theater: '🎭',
+    heart: '❤️',
+    compass: '🧭',
+    'book-heart': '📚',
+    'shield-heart': '🛡️',
+    sparkles: '✨',
+  };
+
+  return iconMap[iconName] || '🤖';
+}
 
 export interface WebViewHandle {
   goBack: () => void;
@@ -32,6 +61,37 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
   const { tabs, activeTabId, updateTab } = useTabsStore();
   const webviewRefs = useRef<Record<string, any>>({});
   const [isPersonalitySelectorOpen, setIsPersonalitySelectorOpen] = useState(false);
+  const [currentPersonality, setCurrentPersonality] = useState<Personality | null>(null);
+
+  // Load current personality on mount
+  useEffect(() => {
+    const loadPersonality = async () => {
+      try {
+        const personality = await window.electron.invoke('personalities:getCurrent');
+        setCurrentPersonality(personality);
+      } catch (error) {
+        console.error('Failed to load current personality:', error);
+      }
+    };
+
+    loadPersonality();
+  }, []);
+
+  // Reload personality when selector closes
+  useEffect(() => {
+    if (!isPersonalitySelectorOpen) {
+      const loadPersonality = async () => {
+        try {
+          const personality = await window.electron.invoke('personalities:getCurrent');
+          setCurrentPersonality(personality);
+        } catch (error) {
+          console.error('Failed to load current personality:', error);
+        }
+      };
+
+      loadPersonality();
+    }
+  }, [isPersonalitySelectorOpen]);
 
   // Get active webview
   const getActiveWebview = () => {
@@ -221,19 +281,24 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         setCanGoForward(webview.canGoForward());
       }
 
+      // Clear the last programmatic URL since this is a real navigation
+      (webview as any).__lastProgrammaticUrl = e.url;
+
       // Update tab URL
       updateTab(tabId, { url: e.url });
 
-      // Save to history
-      const title = webview.getTitle() || e.url;
-      browserDataService
-        .addHistory({
-          url: e.url,
-          title,
-          visitTime: Date.now(),
-          favicon: '',
-        })
-        .catch((err) => console.error('Failed to save history:', err));
+      // Save to history (but not view-source pages)
+      if (!e.url.startsWith('view-source:')) {
+        const title = webview.getTitle() || e.url;
+        browserDataService
+          .addHistory({
+            url: e.url,
+            title,
+            visitTime: Date.now(),
+            favicon: '',
+          })
+          .catch((err) => console.error('Failed to save history:', err));
+      }
     };
 
     const handleDidNavigateInPage = (e: any) => {
@@ -325,8 +390,13 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
         // Only call loadURL if:
         // 1. We have a current URL (webview is ready)
         // 2. The URL is different from what we want to navigate to
-        if (currentUrl && currentUrl !== tab.url) {
-          webview.loadURL(tab.url);
+        // 3. The URL is not a view-source URL (let those load naturally)
+        if (currentUrl && currentUrl !== tab.url && !currentUrl.startsWith('view-source:')) {
+          // Store the last programmatically set URL to avoid loops
+          if ((webview as any).__lastProgrammaticUrl !== tab.url) {
+            (webview as any).__lastProgrammaticUrl = tab.url;
+            webview.loadURL(tab.url);
+          }
         }
       } catch {
         // Webview might not be ready, ignore the error
@@ -410,13 +480,30 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                       Click the AI button to chat with local models about any page.
                     </p>
 
+                    {/* Current Personality Display */}
+                    {currentPersonality && (
+                      <div className="pt-2">
+                        <div className="inline-flex items-center gap-3 px-4 py-3 bg-primary/10 rounded-lg border border-primary/20">
+                          <span className="text-3xl">{getIconEmoji(currentPersonality.icon)}</span>
+                          <div className="text-left">
+                            <div className="text-sm font-semibold text-primary">
+                              Current AI: {currentPersonality.personName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {currentPersonality.name}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Personality Selection Button */}
-                    <div className="pt-4">
+                    <div className="pt-2">
                       <button
                         onClick={() => setIsPersonalitySelectorOpen(true)}
                         className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium shadow-lg"
                       >
-                        Choose AI Personality
+                        {currentPersonality ? 'Change AI Personality' : 'Choose AI Personality'}
                       </button>
                       <p className="text-xs text-muted-foreground mt-2">
                         Customize how your AI assistant talks to you
@@ -452,9 +539,10 @@ export const MultiWebViewContainer = forwardRef<WebViewHandle>((props, ref) => {
                   allowpopups="false"
                   // Security: Enable context isolation, allow javascript and plugins for full browsing
                   // Note: Webviews are sandboxed separately from the main renderer process
-                  webpreferences="contextIsolation=true,javascript=yes,plugins=yes,sandbox=true"
-                  // User agent string for compatibility
-                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                  // Allow downloads by not restricting them in sandbox
+                  webpreferences="contextIsolation=true,javascript=yes,plugins=yes,sandbox=true,enableBlinkFeatures=CSSBackdropFilter"
+                  // User agent string for compatibility - use latest Chrome version
+                  useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
                 />
               )}
             </div>

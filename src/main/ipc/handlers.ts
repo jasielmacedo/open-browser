@@ -1,6 +1,5 @@
 import { ipcMain, BrowserWindow, webContents, dialog, shell, app } from 'electron';
 import path from 'path';
-import fs from 'fs';
 import { databaseService, HistoryEntry, Bookmark, Tab } from '../services/database';
 import {
   validateUrl,
@@ -18,13 +17,12 @@ import type {
   PersonalitiesConfig,
   Personality,
 } from '../../shared/types';
+import personalitiesConfigData from '../../shared/personalities/personalities.json';
 
 // Load personalities configuration
 let personalitiesConfig: PersonalitiesConfig | null = null;
 try {
-  const personalitiesPath = path.join(__dirname, '../../shared/personalities/personalities.json');
-  const personalitiesData = fs.readFileSync(personalitiesPath, 'utf-8');
-  personalitiesConfig = JSON.parse(personalitiesData);
+  personalitiesConfig = personalitiesConfigData as PersonalitiesConfig;
 } catch (error) {
   console.error('Failed to load personalities config:', error);
 }
@@ -384,13 +382,16 @@ export function registerIpcHandlers() {
       const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
-        throw new Error('No active browser tab for vision capture');
+        // Gracefully return null if no active tab - user might have context toggle on in empty tab
+        console.log('capture:forVision: No active browser tab, skipping context capture');
+        return null;
       }
 
       return await captureService.captureForVision(webviewContents);
     } catch (error: any) {
       console.error('capture:forVision error:', error.message);
-      throw error;
+      // Return null instead of throwing - let the chat continue without context
+      return null;
     }
   });
 
@@ -402,13 +403,16 @@ export function registerIpcHandlers() {
       const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
 
       if (!webviewContents) {
-        throw new Error('No active browser tab for text capture');
+        // Gracefully return null if no active tab - user might have context toggle on in empty tab
+        console.log('capture:forText: No active browser tab, skipping context capture');
+        return null;
       }
 
       return await captureService.captureForText(webviewContents);
     } catch (error: any) {
       console.error('capture:forText error:', error.message);
-      throw error;
+      // Return null instead of throwing - let the chat continue without context
+      return null;
     }
   });
 
@@ -516,7 +520,10 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(
     'ollama:chat',
-    async (event, options: ChatOptions & { planningMode?: boolean; tools?: any[]; think?: boolean }) => {
+    async (
+      event,
+      options: ChatOptions & { planningMode?: boolean; tools?: any[]; think?: boolean }
+    ) => {
       try {
         if (!options || typeof options !== 'object') {
           throw new Error('Invalid chat options');
@@ -845,11 +852,25 @@ When Planning Mode is enabled, you have access to these tools:
     }
   });
 
-  ipcMain.handle('settings:set', async (_event, key: string, value: string) => {
+  ipcMain.handle('settings:set', async (_event, key: string, value: any) => {
     try {
       validateString(key, 'Settings key', 256);
-      validateString(value, 'Settings value', 10000); // Allow long values for system prompts
-      return databaseService.setSetting(key, value);
+
+      // Convert value to string if it's not already
+      let stringValue: string;
+      if (typeof value === 'string') {
+        stringValue = value;
+      } else if (typeof value === 'boolean' || typeof value === 'number') {
+        stringValue = String(value);
+      } else if (value === null || value === undefined) {
+        stringValue = '';
+      } else {
+        // For objects/arrays, stringify them
+        stringValue = JSON.stringify(value);
+      }
+
+      validateString(stringValue, 'Settings value', 10000); // Allow long values for system prompts
+      return databaseService.setSetting(key, stringValue);
     } catch (error: any) {
       console.error('settings:set error:', error.message);
       throw error;

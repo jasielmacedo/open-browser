@@ -279,13 +279,18 @@ class DatabaseService {
     if (!this.db) throw new Error('Database not initialized');
 
     if (!query.trim()) {
-      // Return recent history
+      // Return recent history - group by URL to avoid duplicates
       return this.db
         .prepare(
           `
-        SELECT id, url, title, visit_time as visitTime, visit_count as visitCount, favicon
+        SELECT MAX(id) as id, url,
+               MAX(title) as title,
+               MAX(visit_time) as visitTime,
+               SUM(visit_count) as visitCount,
+               MAX(favicon) as favicon
         FROM history
-        ORDER BY visit_time DESC
+        GROUP BY url
+        ORDER BY MAX(visit_time) DESC
         LIMIT ?
       `
         )
@@ -296,14 +301,20 @@ class DatabaseService {
     // This prevents syntax errors from special chars like . : / etc
     const escapedQuery = '"' + query.replace(/"/g, '""') + '"';
 
-    // Full-text search
+    // Full-text search - group by URL to avoid duplicates
     return this.db
       .prepare(
         `
-      SELECT h.id, h.url, h.title, h.visit_time as visitTime, h.visit_count as visitCount, h.favicon
-      FROM history_fts fts
-      JOIN history h ON h.id = fts.rowid
-      WHERE history_fts MATCH ?
+      SELECT h.id, h.url, h.title, h.visit_time as visitTime,
+             h.visit_count as visitCount, h.favicon
+      FROM (
+        SELECT h.url, MAX(h.id) as max_id
+        FROM history_fts fts
+        JOIN history h ON h.id = fts.rowid
+        WHERE history_fts MATCH ?
+        GROUP BY h.url
+      ) grouped
+      JOIN history h ON h.id = grouped.max_id
       ORDER BY h.visit_time DESC
       LIMIT ?
     `
