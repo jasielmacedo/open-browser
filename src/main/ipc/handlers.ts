@@ -1515,4 +1515,15 @@ When Planning Mode is enabled, you have access to these tools:
       throw error;
     }
   });
+
+  // Hide/show active tab view (for modals and overlays)
+  ipcMain.handle('tabWindow:setActiveVisible', async (_event, visible: boolean) => {
+    try {
+      tabWindowManager.setActiveTabVisible(visible);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:setActiveVisible error:', error.message);
+      throw error;
+    }
+  });
 }

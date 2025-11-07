@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export interface TabWindow {
   id: string;
-  view: WebContentsView;
+  view: WebContentsView | null; // Null until URL is loaded
   url: string;
   title: string;
   favicon: string;
@@ -299,6 +299,9 @@ class TabWindowManager {
    * WebContentsViews are positioned below the tab bar and navigation bar
    * Note: WebContentsView renders in a native layer above the renderer's DOM,
    * so we cannot use CSS z-index. We must position it to avoid covering UI elements.
+   *
+   * Strategy: Reserve space for sidebars AND modals to ensure all UI is accessible.
+   * Modals appear centered, so we need margins on all sides.
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
     if (!this.mainWindow) {
@@ -317,12 +320,16 @@ class TabWindowManager {
     // Reserve space on the right for sidebars (ChatSidebar, HistorySidebar, BookmarksSidebar)
     const SIDEBAR_WIDTH = 320;
 
+    // Bottom margin: 60px for download status bar and to avoid covering bottom modals
+    const BOTTOM_MARGIN = 60;
+
     // Position WebContentsView below the UI elements and to the left of sidebars
+    // Keep bottom margin for status bars and modals
     return {
       x: 0,
       y: UI_TOP_HEIGHT,
       width: width - SIDEBAR_WIDTH,
-      height: height - UI_TOP_HEIGHT,
+      height: height - UI_TOP_HEIGHT - BOTTOM_MARGIN,
     };
   }
 
@@ -484,6 +491,21 @@ class TabWindowManager {
    */
   getActiveTabId(): string | null {
     return this.activeTabId;
+  }
+
+  /**
+   * Temporarily hide/show the active tab view (for modals, overlays, etc.)
+   */
+  setActiveTabVisible(visible: boolean) {
+    if (this.activeTabId) {
+      const activeTab = this.tabWindows.get(this.activeTabId);
+      if (activeTab && activeTab.view) {
+        activeTab.view.setVisible(visible);
+        console.log(
+          `[TabWindowManager] Active tab visibility set to: ${visible} for tab ${this.activeTabId}`
+        );
+      }
+    }
   }
 
   /**

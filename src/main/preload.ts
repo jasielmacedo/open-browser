@@ -87,6 +87,7 @@ const ALLOWED_INVOKE_CHANNELS = [
   'tabWindow:zoomIn',
   'tabWindow:zoomOut',
   'tabWindow:resetZoom',
+  'tabWindow:setActiveVisible',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [

@@ -60,9 +60,16 @@ export const ModelManager: React.FC = () => {
       // Load service status
       loadServiceStatus();
 
+      // Hide the active tab view so modal is interactive
+      window.electron.invoke('tabWindow:setActiveVisible', false).catch(console.error);
+
       // Poll service status every 5 seconds
       const interval = setInterval(loadServiceStatus, 5000);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        // Show the active tab view when modal closes
+        window.electron.invoke('tabWindow:setActiveVisible', true).catch(console.error);
+      };
     }
   }, [isModelManagerOpen, refreshModels, loadModelsFolder, loadServiceStatus]);
 
