@@ -193,36 +193,48 @@ export const BrowserLayout: React.FC = () => {
   ]);
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
-      {/* Tab Bar */}
-      <TabBar />
-
-      {/* Navigation Bar */}
-      <NavigationBar browserWindowRef={browserWindowRef} />
-
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* BrowserWindow Container (manages BrowserWindow-based tabs) */}
-        <BrowserWindowContainer ref={browserWindowRef} />
-
-        {/* Sidebars (only one visible at a time) */}
-        <ChatSidebar />
-        <HistorySidebar />
-        <BookmarksSidebar />
+    <div className="flex flex-col h-screen bg-transparent text-foreground pointer-events-none">
+      {/* Tab Bar - captures clicks */}
+      <div className="pointer-events-auto">
+        <TabBar />
       </div>
 
-      {/* Modal Overlays */}
-      <ModelManager />
+      {/* Navigation Bar - captures clicks */}
+      <div className="pointer-events-auto">
+        <NavigationBar browserWindowRef={browserWindowRef} />
+      </div>
 
-      {/* Download Status Bar */}
-      <DownloadStatusBar />
+      {/* Main Content Area - BrowserWindows fill entire window, UI overlays on top */}
+      <div className="flex flex-1 overflow-hidden pointer-events-none">
+        {/* BrowserWindow Container - hidden, manages windows in main process */}
+        <BrowserWindowContainer ref={browserWindowRef} />
 
-      {/* Download Notification Toast */}
+        {/* Sidebars (only one visible at a time) - capture clicks */}
+        <div className="pointer-events-auto">
+          <ChatSidebar />
+          <HistorySidebar />
+          <BookmarksSidebar />
+        </div>
+      </div>
+
+      {/* Modal Overlays - capture clicks */}
+      <div className="pointer-events-auto">
+        <ModelManager />
+      </div>
+
+      {/* Download Status Bar - capture clicks */}
+      <div className="pointer-events-auto">
+        <DownloadStatusBar />
+      </div>
+
+      {/* Download Notification Toast - capture clicks */}
       {downloadNotification && (
-        <DownloadToast
-          filename={downloadNotification}
-          onClose={() => setDownloadNotification(null)}
-        />
+        <div className="pointer-events-auto">
+          <DownloadToast
+            filename={downloadNotification}
+            onClose={() => setDownloadNotification(null)}
+          />
+        </div>
       )}
     </div>
   );

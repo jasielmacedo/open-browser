@@ -303,33 +303,23 @@ class TabWindowManager {
 
   /**
    * Calculate the bounds for tab windows based on main window
-   * Tab windows should fill the content area below the navigation bar
+   * Tab windows fill the ENTIRE content area - UI overlays on top
    */
   private getTabWindowBounds(): { x: number; y: number; width: number; height: number } {
-    // If renderer sent us custom bounds, use those
-    if (this.browserBounds) {
-      return this.browserBounds;
-    }
-
-    // Fallback: calculate default bounds
     if (!this.mainWindow) {
       return { x: 0, y: 0, width: 800, height: 600 };
     }
 
-    // Get the content bounds which gives us width and height
+    // Get the full content bounds
     const contentBounds = this.mainWindow.getContentBounds();
 
-    // The navigation bar + tab bar is approximately 100px tall
-    // This is measured from the actual UI layout (TabBar ~40px + NavigationBar ~60px)
-    const navBarHeight = 100;
-
-    // Child windows should be positioned relative to parent's content area
-    // x: 0, y: navBarHeight means it starts at the top-left of content area, offset by navbar
+    // BrowserWindows fill the entire content area (0, 0, full width, full height)
+    // The UI (navbar, sidebars) will overlay on top using pointer-events CSS
     return {
       x: 0,
-      y: navBarHeight,
+      y: 0,
       width: contentBounds.width,
-      height: contentBounds.height - navBarHeight,
+      height: contentBounds.height,
     };
   }
 
