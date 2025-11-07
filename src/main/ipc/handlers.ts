@@ -1373,4 +1373,84 @@ When Planning Mode is enabled, you have access to these tools:
       throw error;
     }
   });
+
+  // DevTools handler
+  ipcMain.handle('tabWindow:openDevTools', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.openDevTools();
+        return { success: true };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:openDevTools error:', error.message);
+      throw error;
+    }
+  });
+
+  // Print handler
+  ipcMain.handle('tabWindow:print', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.print();
+        return { success: true };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:print error:', error.message);
+      throw error;
+    }
+  });
+
+  // Zoom handlers
+  ipcMain.handle('tabWindow:zoomIn', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        const currentZoom = webContents.getZoomLevel();
+        webContents.setZoomLevel(currentZoom + 0.5);
+        return { success: true, zoomLevel: currentZoom + 0.5 };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:zoomIn error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:zoomOut', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        const currentZoom = webContents.getZoomLevel();
+        webContents.setZoomLevel(currentZoom - 0.5);
+        return { success: true, zoomLevel: currentZoom - 0.5 };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:zoomOut error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:resetZoom', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.setZoomLevel(0);
+        return { success: true, zoomLevel: 0 };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:resetZoom error:', error.message);
+      throw error;
+    }
+  });
 }

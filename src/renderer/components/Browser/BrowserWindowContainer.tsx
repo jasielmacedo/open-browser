@@ -40,6 +40,9 @@ export interface BrowserWindowHandle {
   openDevTools: () => void;
   print: () => void;
   viewSource: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 }
 
 /**
@@ -124,16 +127,55 @@ export const BrowserWindowContainer = forwardRef<BrowserWindowHandle>((props, re
         }
       }
     },
-    openDevTools: () => {
-      console.log('DevTools shortcut - use F12 in the browser window');
+    openDevTools: async () => {
+      if (activeTabId) {
+        try {
+          await window.electron.invoke('tabWindow:openDevTools', activeTabId);
+        } catch (error) {
+          console.error('Failed to open DevTools:', error);
+        }
+      }
     },
-    print: () => {
-      console.log('Print - Ctrl+P in the browser window');
+    print: async () => {
+      if (activeTabId) {
+        try {
+          await window.electron.invoke('tabWindow:print', activeTabId);
+        } catch (error) {
+          console.error('Failed to print:', error);
+        }
+      }
     },
     viewSource: () => {
       const activeTab = tabs.find((t) => t.id === activeTabId);
       if (activeTab?.url) {
         addTab(`view-source:${activeTab.url}`);
+      }
+    },
+    zoomIn: async () => {
+      if (activeTabId) {
+        try {
+          await window.electron.invoke('tabWindow:zoomIn', activeTabId);
+        } catch (error) {
+          console.error('Failed to zoom in:', error);
+        }
+      }
+    },
+    zoomOut: async () => {
+      if (activeTabId) {
+        try {
+          await window.electron.invoke('tabWindow:zoomOut', activeTabId);
+        } catch (error) {
+          console.error('Failed to zoom out:', error);
+        }
+      }
+    },
+    resetZoom: async () => {
+      if (activeTabId) {
+        try {
+          await window.electron.invoke('tabWindow:resetZoom', activeTabId);
+        } catch (error) {
+          console.error('Failed to reset zoom:', error);
+        }
       }
     },
   }));

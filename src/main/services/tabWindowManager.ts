@@ -32,6 +32,12 @@ class TabWindowManager {
     this.mainWindow = mainWindow;
     console.log('[TabWindowManager] Initialized with main window');
 
+    // Listen for main window close to cleanup tab windows
+    mainWindow.on('close', () => {
+      console.log('[TabWindowManager] Main window closing, cleaning up tab windows');
+      this.cleanup();
+    });
+
     // Listen for main window resize/move to update tab window positions
     mainWindow.on('resize', () => this.updateAllTabWindowBounds());
     mainWindow.on('move', () => this.updateAllTabWindowBounds());
@@ -71,13 +77,6 @@ class TabWindowManager {
     tabWindow.setClosable(false);
     tabWindow.setMenuBarVisibility(false);
 
-    // Load the URL
-    if (url) {
-      tabWindow.loadURL(url).catch((err) => {
-        console.error(`[TabWindowManager] Failed to load URL in tab ${tabId}:`, err);
-      });
-    }
-
     const tab: TabWindow = {
       id: tabId,
       window: tabWindow,
@@ -89,11 +88,18 @@ class TabWindowManager {
 
     this.tabWindows.set(tabId, tab);
 
-    // Setup event listeners for this tab window
+    // Setup event listeners BEFORE loading URL to catch all events
     this.setupTabWindowListeners(tab);
 
     // Position the tab window
     this.updateTabWindowBounds(tabId);
+
+    // Load the URL after everything is set up
+    if (url) {
+      tabWindow.loadURL(url).catch((err) => {
+        console.error(`[TabWindowManager] Failed to load URL in tab ${tabId}:`, err);
+      });
+    }
 
     console.log(`[TabWindowManager] Tab window created: ${tabId}`);
     return tab;
@@ -181,6 +187,75 @@ class TabWindowManager {
         url: validatedURL,
       });
     });
+
+    // Handle renderer crashes
+    webContents.on('render-process-gone', (event, details) => {
+      console.error(`[TabWindowManager] Tab ${tab.id} crashed:`, details.reason);
+      this.notifyMainWindow('tab-crashed', {
+        tabId: tab.id,
+        reason: details.reason,
+        exitCode: details.exitCode,
+      });
+
+      // If killed, try to reload
+      if (details.reason === 'killed' || details.reason === 'crashed') {
+        console.log(`[TabWindowManager] Attempting to reload crashed tab ${tab.id}`);
+        setTimeout(() => {
+          if (!tabWindow.isDestroyed()) {
+            tabWindow.reload();
+          }
+        }, 1000);
+      }
+    });
+
+    // Handle unresponsive renderer
+    webContents.on('unresponsive', () => {
+      console.warn(`[TabWindowManager] Tab ${tab.id} became unresponsive`);
+      this.notifyMainWindow('tab-unresponsive', {
+        tabId: tab.id,
+      });
+    });
+
+    webContents.on('responsive', () => {
+      console.log(`[TabWindowManager] Tab ${tab.id} became responsive again`);
+      this.notifyMainWindow('tab-responsive', {
+        tabId: tab.id,
+      });
+    });
+
+    // Handle certificate errors
+    webContents.on('certificate-error', (event, url, error, certificate, callback) => {
+      console.warn(`[TabWindowManager] Certificate error for ${url}: ${error}`);
+      // For now, deny all certificate errors (secure by default)
+      // TODO: Add UI to let user override
+      event.preventDefault();
+      callback(false);
+
+      this.notifyMainWindow('tab-certificate-error', {
+        tabId: tab.id,
+        url,
+        error,
+      });
+    });
+
+    // Handle context menu (right-click)
+    webContents.on('context-menu', (event, params) => {
+      // Notify renderer to show context menu with params
+      this.notifyMainWindow('tab-context-menu', {
+        tabId: tab.id,
+        params: {
+          x: params.x,
+          y: params.y,
+          linkURL: params.linkURL,
+          srcURL: params.srcURL,
+          pageURL: params.pageURL,
+          frameURL: params.frameURL,
+          selectionText: params.selectionText,
+          isEditable: params.isEditable,
+          mediaType: params.mediaType,
+        },
+      });
+    });
   }
 
   /**
@@ -192,18 +267,23 @@ class TabWindowManager {
       return { x: 0, y: 0, width: 800, height: 600 };
     }
 
-    const mainBounds = this.mainWindow.getBounds();
+    // const mainBounds = this.mainWindow.getBounds();
     const mainPosition = this.mainWindow.getPosition();
 
-    // The navigation bar + tab bar is approximately 120px tall
-    // We need to position tab windows below that
+    // Get the actual content bounds from the main window
+    // This accounts for the window frame and title bar
+    const contentBounds = this.mainWindow.getContentBounds();
+
+    // The navigation bar + tab bar + status bar is approximately 120px tall
+    // This is measured from the actual UI layout (TabBar ~40px + NavigationBar ~60px + padding ~20px)
+    // TODO: Make this dynamic by receiving actual measurements from renderer
     const navBarHeight = 120;
 
     return {
       x: mainPosition[0],
       y: mainPosition[1] + navBarHeight,
-      width: mainBounds.width,
-      height: mainBounds.height - navBarHeight,
+      width: contentBounds.width,
+      height: contentBounds.height - navBarHeight,
     };
   }
 

@@ -82,6 +82,11 @@ const ALLOWED_INVOKE_CHANNELS = [
   'tabWindow:reload',
   'tabWindow:stop',
   'tabWindow:getInfo',
+  'tabWindow:openDevTools',
+  'tabWindow:print',
+  'tabWindow:zoomIn',
+  'tabWindow:zoomOut',
+  'tabWindow:resetZoom',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -107,6 +112,11 @@ const ALLOWED_LISTEN_CHANNELS = [
   'tab-request-new',
   'tab-load-error',
   'tab-activated',
+  'tab-crashed',
+  'tab-unresponsive',
+  'tab-responsive',
+  'tab-certificate-error',
+  'tab-context-menu',
 ];
 
 // Expose protected methods that allow the renderer process to use

@@ -505,6 +505,68 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ browserWindowRef }
     },
     { label: '', separator: true, onClick: () => {} },
     {
+      label: 'Zoom In',
+      shortcut: 'Ctrl++',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"
+          />
+        </svg>
+      ),
+      onClick: () => browserWindowRef.current?.zoomIn(),
+    },
+    {
+      label: 'Zoom Out',
+      shortcut: 'Ctrl+-',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"
+          />
+        </svg>
+      ),
+      onClick: () => browserWindowRef.current?.zoomOut(),
+    },
+    {
+      label: 'Reset Zoom',
+      shortcut: 'Ctrl+0',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      ),
+      onClick: () => browserWindowRef.current?.resetZoom(),
+    },
+    { label: '', separator: true, onClick: () => {} },
+    {
+      label: 'Print...',
+      shortcut: 'Ctrl+P',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+          />
+        </svg>
+      ),
+      onClick: () => browserWindowRef.current?.print(),
+    },
+    { label: '', separator: true, onClick: () => {} },
+    {
       label: 'View Page Source',
       shortcut: 'Ctrl+U',
       icon: (

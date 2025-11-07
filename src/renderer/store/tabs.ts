@@ -125,10 +125,21 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     get().saveTabs();
   },
 
-  updateTab: (tabId: string, updates: Partial<Tab>) => {
+  updateTab: async (tabId: string, updates: Partial<Tab>) => {
+    const oldTab = get().tabs.find((t) => t.id === tabId);
+
     set((state) => ({
       tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, ...updates } : tab)),
     }));
+
+    // If URL changed, navigate the browser window
+    if (updates.url && oldTab && updates.url !== oldTab.url) {
+      try {
+        await window.electron.invoke('tabWindow:navigate', tabId, updates.url);
+      } catch (error) {
+        console.error('Failed to navigate tab:', error);
+      }
+    }
 
     // Debounced save (title/url updates happen frequently)
     setTimeout(() => get().saveTabs(), 1000);

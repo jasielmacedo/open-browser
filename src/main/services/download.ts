@@ -136,7 +136,7 @@ class DownloadService {
   /**
    * Handle download item and save to database
    */
-  handleDownload(item: DownloadItem, savePath: string, webContents: Electron.WebContents): number {
+  handleDownload(item: DownloadItem, savePath: string, _webContents?: unknown): number {
     const filename = path.basename(savePath);
 
     // Create download record in database

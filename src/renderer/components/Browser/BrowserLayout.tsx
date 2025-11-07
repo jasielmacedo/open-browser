@@ -133,6 +133,21 @@ export const BrowserLayout: React.FC = () => {
         e.preventDefault();
         browserWindowRef.current?.reload();
       }
+      // Ctrl/Cmd + Plus - Zoom in
+      else if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+        e.preventDefault();
+        browserWindowRef.current?.zoomIn();
+      }
+      // Ctrl/Cmd + Minus - Zoom out
+      else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        browserWindowRef.current?.zoomOut();
+      }
+      // Ctrl/Cmd + 0 - Reset zoom
+      else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        browserWindowRef.current?.resetZoom();
+      }
       // Alt + Left Arrow - Back
       else if (e.altKey && e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -143,10 +158,20 @@ export const BrowserLayout: React.FC = () => {
         e.preventDefault();
         browserWindowRef.current?.goForward();
       }
+      // Ctrl/Cmd + P - Print
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        browserWindowRef.current?.print();
+      }
       // Ctrl/Cmd + U - View Page Source
       else if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
         e.preventDefault();
         browserWindowRef.current?.viewSource();
+      }
+      // F12 - Developer Tools
+      else if (e.key === 'F12') {
+        e.preventDefault();
+        browserWindowRef.current?.openDevTools();
       }
       // Escape - Stop loading
       else if (e.key === 'Escape') {
