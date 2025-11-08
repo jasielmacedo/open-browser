@@ -16,6 +16,11 @@ export const PersonalitySelector: React.FC<PersonalitySelectorProps> = ({ isOpen
   useEffect(() => {
     if (isOpen) {
       loadPersonalities();
+      // Hide the active tab view so modal is interactive
+      window.electron.invoke('tabWindow:setActiveVisible', false).catch(console.error);
+    } else {
+      // Show the active tab view when modal closes
+      window.electron.invoke('tabWindow:setActiveVisible', true).catch(console.error);
     }
   }, [isOpen]);
 

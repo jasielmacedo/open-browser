@@ -60,9 +60,16 @@ export const ModelManager: React.FC = () => {
       // Load service status
       loadServiceStatus();
 
+      // Hide the active tab view so modal is interactive
+      window.electron.invoke('tabWindow:setActiveVisible', false).catch(console.error);
+
       // Poll service status every 5 seconds
       const interval = setInterval(loadServiceStatus, 5000);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        // Show the active tab view when modal closes
+        window.electron.invoke('tabWindow:setActiveVisible', true).catch(console.error);
+      };
     }
   }, [isModelManagerOpen, refreshModels, loadModelsFolder, loadServiceStatus]);
 
@@ -122,7 +129,9 @@ export const ModelManager: React.FC = () => {
   };
 
   const handleForceKill = async () => {
-    if (!confirm('Are you sure you want to force kill the Ollama process? This may cause data loss.')) {
+    if (
+      !confirm('Are you sure you want to force kill the Ollama process? This may cause data loss.')
+    ) {
       return;
     }
     try {
@@ -138,7 +147,7 @@ export const ModelManager: React.FC = () => {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   const formatUptime = (seconds: number) => {
@@ -304,17 +313,23 @@ export const ModelManager: React.FC = () => {
                     {serviceStatus.processStats.uptime > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="text-muted-foreground">Uptime:</span>
-                        <span className="font-mono">{formatUptime(serviceStatus.processStats.uptime)}</span>
+                        <span className="font-mono">
+                          {formatUptime(serviceStatus.processStats.uptime)}
+                        </span>
                       </div>
                     )}
                     <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">Memory:</span>
-                      <span className="font-mono">{formatBytes(serviceStatus.processStats.memory.rss)}</span>
+                      <span className="font-mono">
+                        {formatBytes(serviceStatus.processStats.memory.rss)}
+                      </span>
                     </div>
                     {serviceStatus.processStats.cpu > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="text-muted-foreground">CPU:</span>
-                        <span className="font-mono">{serviceStatus.processStats.cpu.toFixed(1)}%</span>
+                        <span className="font-mono">
+                          {serviceStatus.processStats.cpu.toFixed(1)}%
+                        </span>
                       </div>
                     )}
                   </div>
@@ -323,18 +338,14 @@ export const ModelManager: React.FC = () => {
                     Service is running but process details unavailable
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Service is not running
-                  </p>
+                  <p className="text-xs text-muted-foreground">Service is not running</p>
                 )}
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm text-muted-foreground">
-              Manage your local AI models
-            </div>
+            <div className="text-sm text-muted-foreground">Manage your local AI models</div>
             <button
               onClick={() => setIsModelManagerOpen(false)}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"

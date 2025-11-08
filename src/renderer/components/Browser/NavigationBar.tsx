@@ -3,7 +3,7 @@ import { useBrowserStore } from '../../store/browser';
 import { useTabsStore } from '../../store/tabs';
 import { useModelStore } from '../../store/models';
 import { useChatStore } from '../../store/chat';
-import { WebViewHandle } from './MultiWebViewContainer';
+import { BrowserWindowHandle } from './BrowserWindowContainer';
 import { browserDataService } from '../../services/browserData';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
 import { SystemPromptSettings } from '../Settings/SystemPromptSettings';
@@ -11,10 +11,10 @@ import { DownloadDropdown } from './DownloadDropdown';
 import { supportsVision } from '../../../shared/modelRegistry';
 
 interface NavigationBarProps {
-  webviewRef: RefObject<WebViewHandle>;
+  browserWindowRef: RefObject<BrowserWindowHandle>;
 }
 
-export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
+export const NavigationBar: React.FC<NavigationBarProps> = ({ browserWindowRef }) => {
   const {
     currentUrl,
     pageTitle,
@@ -25,6 +25,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     canGoForward,
     isChatOpen,
     isBookmarked,
+    zoomLevel,
     setCurrentUrl,
     setIsBookmarked,
     toggleChat,
@@ -46,7 +47,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   const [showSystemPromptSettings, setShowSystemPromptSettings] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [activeDownloadsCount, setActiveDownloadsCount] = useState(0);
-  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadButtonRef = useRef<React.ElementRef<'button'>>(null);
 
   // Sync inputValue with currentUrl when not focused (for tab changes)
   useEffect(() => {
@@ -309,18 +310,18 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
   };
 
   const handleBack = () => {
-    webviewRef.current?.goBack();
+    browserWindowRef.current?.goBack();
   };
 
   const handleForward = () => {
-    webviewRef.current?.goForward();
+    browserWindowRef.current?.goForward();
   };
 
   const handleRefresh = () => {
     if (isLoading) {
-      webviewRef.current?.stop();
+      browserWindowRef.current?.stop();
     } else {
-      webviewRef.current?.reload();
+      browserWindowRef.current?.reload();
     }
   };
 
@@ -379,30 +380,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
     }
 
     try {
-      // Get selected text
-      const selectedText = await webviewRef.current?.executeJavaScript(
-        'window.getSelection().toString()'
-      );
-
-      if (!selectedText) {
-        alert('Please select some text first');
-        return;
-      }
-
-      // Open chat if not already open
-      if (!isChatOpen) {
-        toggleChat();
-      }
-
-      // Capture page context
-      const pageCapture = await window.electron.invoke('capture:forText');
-
-      // Send to AI with selected text in context
-      const prompt = `Please explain the following text:\n\n"${selectedText}"`;
-      await sendChatMessage(prompt, undefined, {
-        ...pageCapture,
-        selectedText,
-      });
+      // Note: With BrowserWindow tabs, we can't directly execute JavaScript
+      // User should select text and use context menu instead
+      alert('Please select text and use the right-click context menu "Explain this"');
     } catch (error) {
       console.error('Failed to explain selection:', error);
       alert('Failed to explain text. Please try again.');
@@ -538,7 +518,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.zoomIn(),
+      onClick: () => browserWindowRef.current?.zoomIn(),
     },
     {
       label: 'Zoom Out',
@@ -553,7 +533,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.zoomOut(),
+      onClick: () => browserWindowRef.current?.zoomOut(),
     },
     {
       label: 'Reset Zoom',
@@ -568,7 +548,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.resetZoom(),
+      onClick: () => browserWindowRef.current?.resetZoom(),
     },
     { label: '', separator: true, onClick: () => {} },
     {
@@ -584,8 +564,9 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.print(),
+      onClick: () => browserWindowRef.current?.print(),
     },
+    { label: '', separator: true, onClick: () => {} },
     {
       label: 'View Page Source',
       shortcut: 'Ctrl+U',
@@ -599,7 +580,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.viewSource(),
+      onClick: () => browserWindowRef.current?.viewSource(),
       disabled: !hasUrl,
     },
     {
@@ -615,7 +596,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
           />
         </svg>
       ),
-      onClick: () => webviewRef.current?.openDevTools(),
+      onClick: () => browserWindowRef.current?.openDevTools(),
     },
   ];
 
@@ -808,6 +789,24 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ webviewRef }) => {
             </div>
           )}
         </div>
+
+        {/* Zoom Indicator - only show when zoom is not 100% */}
+        {zoomLevel !== 100 && (
+          <div
+            className="flex items-center gap-1 px-2 py-1 bg-accent rounded text-xs font-medium text-foreground"
+            title="Current page zoom level"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <span>{zoomLevel}%</span>
+          </div>
+        )}
 
         {/* Bookmark Toggle Button */}
         <button

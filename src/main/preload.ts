@@ -73,6 +73,21 @@ const ALLOWED_INVOKE_CHANNELS = [
   'agreement:check',
   'agreement:accept',
   'app:quit',
+  'tabWindow:create',
+  'tabWindow:close',
+  'tabWindow:setActive',
+  'tabWindow:navigate',
+  'tabWindow:goBack',
+  'tabWindow:goForward',
+  'tabWindow:reload',
+  'tabWindow:stop',
+  'tabWindow:getInfo',
+  'tabWindow:openDevTools',
+  'tabWindow:print',
+  'tabWindow:zoomIn',
+  'tabWindow:zoomOut',
+  'tabWindow:resetZoom',
+  'tabWindow:setActiveVisible',
 ];
 
 const ALLOWED_LISTEN_CHANNELS = [
@@ -89,6 +104,21 @@ const ALLOWED_LISTEN_CHANNELS = [
   'ai-summarize-selection',
   'download:progress',
   'download:complete',
+  'tab-title-updated',
+  'tab-favicon-updated',
+  'tab-loading-start',
+  'tab-loading-stop',
+  'tab-did-navigate',
+  'tab-did-navigate-in-page',
+  'tab-request-new',
+  'tab-load-error',
+  'tab-activated',
+  'tab-crashed',
+  'tab-unresponsive',
+  'tab-responsive',
+  'tab-certificate-error',
+  'tab-context-menu',
+  'tab-zoom-changed',
 ];
 
 // Expose protected methods that allow the renderer process to use

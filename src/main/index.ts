@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { databaseService } from './services/database';
 import { ollamaService } from './services/ollama';
 import { downloadService } from './services/download';
+import { tabWindowManager } from './services/tabWindowManager';
 import { registerIpcHandlers } from './ipc/handlers';
 
 // Polyfill __dirname for ESM
@@ -301,6 +302,12 @@ app.whenReady().then(async () => {
 
   createWindow();
 
+  // Initialize tab window manager after main window is created
+  if (mainWindow) {
+    tabWindowManager.initialize(mainWindow);
+    console.log('[Main] TabWindowManager initialized');
+  }
+
   // On macOS, re-create window when dock icon is clicked and no windows are open
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -328,6 +335,14 @@ async function performCleanup(): Promise<void> {
 
   cleanupPerformed = true;
   console.log('[Main] Performing cleanup...');
+
+  try {
+    // Cleanup tab windows
+    tabWindowManager.cleanup();
+    console.log('[Main] Tab windows cleaned up');
+  } catch (error) {
+    console.error('[Main] Error cleaning up tab windows:', error);
+  }
 
   try {
     // Stop Ollama service first
@@ -547,7 +562,9 @@ app.on('web-contents-created', (event, contents) => {
                 );
                 console.log('[Context Menu] User selected save path:', savePath);
                 if (savePath) {
-                  console.log('[Context Menu] Registering custom save path and triggering download');
+                  console.log(
+                    '[Context Menu] Registering custom save path and triggering download'
+                  );
                   // Register the custom save path for this URL
                   downloadService.setCustomSavePath(linkUrl, savePath);
                   // Trigger download - will use the custom path

@@ -10,6 +10,7 @@ import {
 import { ollamaService } from '../services/ollama';
 import { captureService } from '../services/capture';
 import { downloadService } from '../services/download';
+import { tabWindowManager } from '../services/tabWindowManager';
 import { createDownloadManagerWindow } from '../index';
 import type {
   GenerateOptions,
@@ -377,17 +378,21 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('capture:forVision', async (_event) => {
     try {
-      // Find the active webview (browser tab) instead of the chat window
-      const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
-
-      if (!webviewContents) {
+      // Get active tab window
+      const activeTabId = tabWindowManager.getActiveTabId();
+      if (!activeTabId) {
         // Gracefully return null if no active tab - user might have context toggle on in empty tab
         console.log('capture:forVision: No active browser tab, skipping context capture');
         return null;
       }
 
-      return await captureService.captureForVision(webviewContents);
+      const tabWebContents = tabWindowManager.getTabWebContents(activeTabId);
+      if (!tabWebContents) {
+        console.log('capture:forVision: Could not access tab contents');
+        return null;
+      }
+
+      return await captureService.captureForVision(tabWebContents);
     } catch (error: any) {
       console.error('capture:forVision error:', error.message);
       // Return null instead of throwing - let the chat continue without context
@@ -397,18 +402,21 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('capture:forText', async (_event) => {
     try {
-      // Find the active webview (browser tab) instead of the chat window
-      // Webviews have type 'webview' and are guest windows
-      const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
-
-      if (!webviewContents) {
+      // Get active tab window
+      const activeTabId = tabWindowManager.getActiveTabId();
+      if (!activeTabId) {
         // Gracefully return null if no active tab - user might have context toggle on in empty tab
         console.log('capture:forText: No active browser tab, skipping context capture');
         return null;
       }
 
-      return await captureService.captureForText(webviewContents);
+      const tabWebContents = tabWindowManager.getTabWebContents(activeTabId);
+      if (!tabWebContents) {
+        console.log('capture:forText: Could not access tab contents');
+        return null;
+      }
+
+      return await captureService.captureForText(tabWebContents);
     } catch (error: any) {
       console.error('capture:forText error:', error.message);
       // Return null instead of throwing - let the chat continue without context
@@ -741,17 +749,20 @@ When Planning Mode is enabled, you have access to these tools:
 
   ipcMain.handle('tool:analyze_page_content', async (_event) => {
     try {
-      // Find the active webview (browser tab) instead of the main window
-      const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
-
-      if (!webviewContents) {
+      // Get active tab window
+      const activeTabId = tabWindowManager.getActiveTabId();
+      if (!activeTabId) {
         throw new Error(
           'No browser tab is currently open. Please open a webpage first, then try again.'
         );
       }
 
-      const capture = await captureService.capturePage(webviewContents, {
+      const tabWebContents = tabWindowManager.getTabWebContents(activeTabId);
+      if (!tabWebContents) {
+        throw new Error('Could not access tab contents');
+      }
+
+      const capture = await captureService.capturePage(tabWebContents, {
         includeScreenshot: false,
         extractReadable: true,
       });
@@ -770,17 +781,20 @@ When Planning Mode is enabled, you have access to these tools:
 
   ipcMain.handle('tool:capture_screenshot', async (_event) => {
     try {
-      // Find the active webview (browser tab) instead of the main window
-      const allWebContents = webContents.getAllWebContents();
-      const webviewContents = allWebContents.find((wc) => wc.getType() === 'webview');
-
-      if (!webviewContents) {
+      // Get active tab window
+      const activeTabId = tabWindowManager.getActiveTabId();
+      if (!activeTabId) {
         throw new Error(
           'No browser tab is currently open. Please open a webpage first, then try again.'
         );
       }
 
-      const screenshot = await captureService.captureScreenshot(webviewContents);
+      const tabWebContents = tabWindowManager.getTabWebContents(activeTabId);
+      if (!tabWebContents) {
+        throw new Error('Could not access tab contents');
+      }
+
+      const screenshot = await captureService.captureScreenshot(tabWebContents);
       return { screenshot };
     } catch (error: any) {
       console.error('tool:capture_screenshot error:', error.message);
@@ -1238,6 +1252,277 @@ When Planning Mode is enabled, you have access to these tools:
       return { success: true };
     } catch (error: any) {
       console.error('app:quit error:', error.message);
+      throw error;
+    }
+  });
+
+  // Tab window handlers (BrowserWindow-based tabs)
+  ipcMain.handle('tabWindow:create', async (_event, tabId: string, url: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      if (url) {
+        validateUrl(url, 'URL');
+      }
+      const tab = tabWindowManager.createTab(tabId, url);
+      return {
+        id: tab.id,
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favicon,
+      };
+    } catch (error: any) {
+      console.error('tabWindow:create error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:close', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.closeTab(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:close error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:setActive', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.setActiveTab(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:setActive error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:navigate', async (_event, tabId: string, url: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      validateUrl(url, 'URL');
+      tabWindowManager.navigateTab(tabId, url);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:navigate error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:goBack', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.goBack(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:goBack error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:goForward', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.goForward(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:goForward error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:reload', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.reload(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:reload error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:stop', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      tabWindowManager.stop(tabId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:stop error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:getInfo', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const tab = tabWindowManager.getTabInfo(tabId);
+      if (!tab) {
+        throw new Error(`Tab not found: ${tabId}`);
+      }
+      return {
+        id: tab.id,
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favicon,
+        isActive: tab.isActive,
+      };
+    } catch (error: any) {
+      console.error('tabWindow:getInfo error:', error.message);
+      throw error;
+    }
+  });
+
+  // DevTools handler
+  ipcMain.handle('tabWindow:openDevTools', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.openDevTools();
+        return { success: true };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:openDevTools error:', error.message);
+      throw error;
+    }
+  });
+
+  // Print handler
+  ipcMain.handle('tabWindow:print', async (_event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.print();
+        return { success: true };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:print error:', error.message);
+      throw error;
+    }
+  });
+
+  // Zoom handlers
+  ipcMain.handle('tabWindow:zoomIn', async (event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        const currentZoom = webContents.getZoomLevel();
+        const newZoom = currentZoom + 0.5;
+        webContents.setZoomLevel(newZoom);
+
+        // Save zoom level per-origin (like Chrome)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, newZoom);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: newZoom,
+            zoomFactor: webContents.getZoomFactor(),
+          });
+        }
+
+        return { success: true, zoomLevel: newZoom };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:zoomIn error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:zoomOut', async (event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        const currentZoom = webContents.getZoomLevel();
+        const newZoom = currentZoom - 0.5;
+        webContents.setZoomLevel(newZoom);
+
+        // Save zoom level per-origin (like Chrome)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, newZoom);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: newZoom,
+            zoomFactor: webContents.getZoomFactor(),
+          });
+        }
+
+        return { success: true, zoomLevel: newZoom };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:zoomOut error:', error.message);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('tabWindow:resetZoom', async (event, tabId: string) => {
+    try {
+      validateString(tabId, 'Tab ID', 256);
+      const webContents = tabWindowManager.getTabWebContents(tabId);
+      if (webContents) {
+        webContents.setZoomLevel(0);
+
+        // Save zoom level per-origin (like Chrome) - reset to 0 (100%)
+        const currentUrl = webContents.getURL();
+        try {
+          const origin = new URL(currentUrl).origin;
+          databaseService.setZoomLevel(origin, 0);
+        } catch (_err) {
+          console.warn('[Zoom] Invalid URL, cannot save zoom preference:', currentUrl);
+        }
+
+        // Send zoom level update to renderer
+        const mainWindow = BrowserWindow.getAllWindows()[0];
+        if (mainWindow) {
+          mainWindow.webContents.send('tab-zoom-changed', {
+            tabId,
+            zoomLevel: 0,
+            zoomFactor: 1.0,
+          });
+        }
+
+        return { success: true, zoomLevel: 0 };
+      }
+      throw new Error(`Tab not found: ${tabId}`);
+    } catch (error: any) {
+      console.error('tabWindow:resetZoom error:', error.message);
+      throw error;
+    }
+  });
+
+  // Hide/show active tab view (for modals and overlays)
+  ipcMain.handle('tabWindow:setActiveVisible', async (_event, visible: boolean) => {
+    try {
+      tabWindowManager.setActiveTabVisible(visible);
+      return { success: true };
+    } catch (error: any) {
+      console.error('tabWindow:setActiveVisible error:', error.message);
       throw error;
     }
   });

@@ -168,8 +168,8 @@ export const SystemPromptSettings: React.FC<SystemPromptSettingsProps> = ({ isOp
                 <div className="flex-1">
                   <label className="block text-sm font-medium mb-1">Thinking Mode</label>
                   <p className="text-xs text-muted-foreground">
-                    Enable advanced reasoning and tool calling for complex tasks. Disable for faster,
-                    direct responses to simple questions.
+                    Enable advanced reasoning and tool calling for complex tasks. Disable for
+                    faster, direct responses to simple questions.
                   </p>
                 </div>
                 <button

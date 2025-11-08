@@ -1210,7 +1210,9 @@ export class OllamaService {
    */
   async *chat(
     request: ChatRequest
-  ): AsyncGenerator<string | { type: 'tool_calls'; tool_calls: any[] } | { type: 'thinking'; content: string }> {
+  ): AsyncGenerator<
+    string | { type: 'tool_calls'; tool_calls: any[] } | { type: 'thinking'; content: string }
+  > {
     await this.ensureRunning();
 
     // Track if thinking mode is enabled
